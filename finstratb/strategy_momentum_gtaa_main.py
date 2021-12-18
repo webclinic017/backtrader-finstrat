@@ -11,8 +11,8 @@ import datetime
 
 from universe_11 import (
     EXTENDED_UNIVERSE,
-    BASIC_SECTOR_UNIVERSE, 
-    INVESCO_EQUAL_WEIGHT_ETF, 
+    BASIC_SECTOR_UNIVERSE,
+    INVESCO_EQUAL_WEIGHT_ETF,
     INVESCO_STYLE_ETF,
     VANGUARD_SECTOR_ETF,
     VANGUARD_STYLE_ETF,
@@ -62,16 +62,10 @@ class Strategy(bt.Strategy):
     params = dict(
         momentum=Momentum,  # parametrize the momentum and its period
         long_momentum_period=90,
-        #  short_momentum_period = 30,
         max_stocks=2,
         movav=bt.ind.SMA,  # parametrize the moving average and its periods
-        # idx_period = 200,
-        # stock_period = 100,
-        # volatr = bt.ind.ATR,  # parametrize the volatility and its period
-        # vol_period = 20,
-        # rebalance_months = [1,4,7,10]
         # See here - https://www.investopedia.com/ask/answers/122214/what-does-end-quarter-mean-portfolio-management.asp
-       # rebalance_months = [1,2,3,4,5,6,7,8,9,10,11,12],
+        # rebalance_months = [1,2,3,4,5,6,7,8,9,10,11,12],
         rebalance_months=[1, 4, 7, 10],
         profit_take_pct=0.3,
         stop_loss_pct=-0.25
@@ -85,10 +79,11 @@ class Strategy(bt.Strategy):
         self.stocks = self.datas[1:]
 
         self.spy_sma200 = self.p.movav(self.spy.close, period=200)
-        
+
        # self.spy_sma50 = self.p.movav(self.spy.close, period=50)
-        self.safe_assets = [d for d in self.stocks if d._name in ["TLT", 'GLD']] #+ [self.spy]
-        self.safe_asset_weights = {"GLD": 0.1, "TLT": 0.4}# , 'SPY':0.05}
+        self.safe_assets = [d for d in self.stocks if d._name in [
+            "TLT", 'GLD']]  # + [self.spy]
+        self.safe_asset_weights = {"GLD": 0.1, "TLT": 0.4}  # , 'SPY':0.05}
         self.hedge = False
         self.d_with_len = self.stocks
         self.buy_positions = []
@@ -99,22 +94,12 @@ class Strategy(bt.Strategy):
         self.is_downtrend = False
 
         for d in self.stocks:
-            #   print(d.name)
-            # self.inds[d] = {}
             self.inds[d]["long_momentum"] = Momentum(
                 d.close, period=self.p.long_momentum_period
             )
-            #    self.inds[d]["short_momentum"] = Momentum(d.close, period=self.p.short_momentum_period)
-            # self.inds[d]["short_momentum"] = Momentum(d.close, period=30)
-
             self.inds[d]["sma200"] = bt.indicators.SMA(d.close, period=200)
-            self.inds[d]["sma50"] = bt.indicators.SMA(d.close, period=50)
-            
-
-            #  self.inds[d]["sma300"] = bt.indicators.SMA(d.close, period=300)
-            #  self.inds[d]["sma200"] = bt.indicators.SmoothedMovingAverage(d.close, period=200)
-            self.inds[d]["pct_change1"] = bt.indicators.PercentChange(d.close, period=1)
-            # self.inds[d]["atr20"] = bt.indicators.ATR(d, period=20)
+            self.inds[d]["pct_change1"] = bt.indicators.PercentChange(
+                d.close, period=1)
 
         self.add_timer(
             name="rebalance",
@@ -129,7 +114,7 @@ class Strategy(bt.Strategy):
             when=bt.timer.SESSION_START,
             monthdays=[
                 6
-            ],  # Day 6 is arbitrary, we need to be sure to be check for risks after the rebalance, in case re
+            ],  # Day 6 is arbitrary, we need to be sure to be check for risks after the rebalance
             monthcarry=True,
             cheat=False,
         )
@@ -179,7 +164,8 @@ class Strategy(bt.Strategy):
         self.downtrend = 1
 
         for d in self.safe_assets:
-            self.order_target_percent(d, target=self.safe_asset_weights[d._name])
+            self.order_target_percent(
+                d, target=self.safe_asset_weights[d._name])
             self.buy_price[d] = d.close[0]
             self.trailing_price[d] = d.close[0]
 
@@ -205,17 +191,12 @@ class Strategy(bt.Strategy):
                 continue
 
             if d in self.trailing_price and (d.close[-1] / self.trailing_price[d] - 1.0 < self.p.stop_loss_pct):
-                self.log(f"RISK MANAGEMENT: TRAILING STOP LOSS for {d._name}, price: {d[-1]:.2f}")
+                self.log(
+                    f"RISK MANAGEMENT: TRAILING STOP LOSS for {d._name}, price: {d[-1]:.2f}")
                 self.close(d)
                 continue
 
-            # if ( d.close[-1] < self.inds[d]["sma200"][-1]):  # -1 since we are using COC for buy orders. For sell orders we want to execute based on yesterday's data
-            #     self.log(
-            #         f"RISK MANAGEMENT: PRICE<SMA200, EXITING POSITING for {d._name}, price used for check: {d[-1]:.2f}"
-            #     )
-            #     self.close(d)
-
-    def rebalance_portfolio(self, recovery_mode = False):
+    def rebalance_portfolio(self, recovery_mode=False):
         # only look at data that we can have indicators for
         # Get current positions
         posdata = [d for d, pos in self.getpositions().items() if pos]
@@ -225,22 +206,19 @@ class Strategy(bt.Strategy):
             self.global_market_risk_hedge()
             self.skip_hedge = True
             return
-        
+
         self.is_downtrend = False
 
         if recovery_mode:
             all_valid_etfs = [
                 d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1] and d not in self.safe_assets
             ]
-        
+
         else:
             all_valid_etfs = [
-                    d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1]
-                ]  # self.d_with_len #
-        # volatile_positions = self.get_volatile_positions(all_valid_etfs)
-        # all_valid_etfs = [d for d in all_valid_etfs if d not in volatile_positions]
+                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1]
+            ]  # self.d_with_len #
 
-        #   negative_short_momentums = [d for d in all_valid_etfs if self.inds[d]["short_momentum"][0] < 0]
         top_long_momentums = sorted(
             all_valid_etfs, key=lambda d: self.inds[d]["long_momentum"][0], reverse=True
         )[: self.p.max_stocks]
@@ -256,14 +234,11 @@ class Strategy(bt.Strategy):
         # self.rebalance_sell_date = self.datas[0].datetime[0]
 
         if self.buy_positions:
-            # weights = self.get_gmv_weights(
-            #      self.buy_positions
-            #  )  # Global minimum variance portfolio
-           # weights = self.get_erc_weights(self.buy_positions) # Equal risk contributions (risk parity)
+
             self.log(f"Available cash: {self.broker.get_cash():.2f}")
 
             weights = [1.0 / self.p.max_stocks] * len(self.buy_positions)
-           # weights = self.get_weights_linear_increasing()
+
             for w, d in zip(weights, self.buy_positions):
                 self.log(
                     f"Entering position: {d._name}: Price: {d[0]:.2f}, Weight: {w:.2f}"
@@ -273,47 +248,6 @@ class Strategy(bt.Strategy):
                 o = self.order_target_percent(d, target=0.98 * w)
                 self.buy_price[d] = d.close[0]
                 self.trailing_price[d] = d.close[0]
-
-    def get_weights_linear_increasing(self) -> List[float]:
-        weights = np.arange(self.p.max_stocks, 0, -1)
-        #weights = np.arange(1, self.max_tickers+1)
-        weights = weights/weights.sum()
-        return weights
-        #return {t:w for t,w in zip(tickers_df.index, weights[:len(tickers_df)])}
-    
-    
-    
-    def get_gmv_weights(self, buy_positions) -> list:
-        try:
-            rets = np.stack(
-                (
-                    [
-                        self.inds[d]["pct_change1"].get(0, 60).tolist()
-                        for d in buy_positions
-                    ]
-                )
-            ).T
-            gmv_weights = erk.weight_gmv(pd.DataFrame(rets))
-        except ValueError:
-            self.log("Error with weights, falling back to EW")
-            gmv_weights = [1.0 / self.p.max_stocks] * len(buy_positions)
-        return gmv_weights
-
-    def get_erc_weights(self, buy_positions) -> list:
-        try:
-            rets = np.stack(
-                (
-                    [
-                        self.inds[d]["pct_change1"].get(0, 60).tolist()
-                        for d in buy_positions
-                    ]
-                )
-            ).T
-            erc_weights = erk.weight_erc(pd.DataFrame(rets))
-        except ValueError:
-            self.log("Error with weights, falling back to EW")
-            erc_weights = [1.0 / self.p.max_stocks] * len(buy_positions)
-        return erc_weights
 
     def notify_timer(self, timer, when, *args, **kwargs):
         if kwargs["name"] == "rebalance":
@@ -376,7 +310,7 @@ if __name__ == "__main__":
     cerebro.broker.set_checksubmit(checksubmit=False)
 
     data_dict = get_data(symbols=["SPY"] + universe)
-    from_date = datetime.datetime(2005,12,15)
+    from_date = datetime.datetime(2005, 12, 15)
     #to_date = datetime.datetime(2020,2,17)
     to_date = datetime.datetime.now()
 
@@ -422,7 +356,7 @@ if __name__ == "__main__":
     print("Starting Portfolio Value: %.2f" % cerebro.broker.getvalue())
 
     cerebro.addstrategy(Strategy)
-    #cerebro.addstrategy(BuyAndHold_1)
+    # cerebro.addstrategy(BuyAndHold_1)
     results = cerebro.run()
 
     print(
@@ -439,5 +373,6 @@ if __name__ == "__main__":
     returns, positions, transactions, gross_lev = pyfoliozer.get_pf_items()
     returns.index = returns.index.tz_convert(None)
 
-    quantstats.reports.html(returns, benchmark="SPY", output="results/rotation_stats_gtaa.html")
+    quantstats.reports.html(returns, benchmark="SPY",
+                            output="results/rotation_stats_gtaa.html")
     cerebro.plot(iplot=False)[0][0]
