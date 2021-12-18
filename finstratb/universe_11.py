@@ -64,7 +64,7 @@ BASIC_SECTOR_UNIVERSE = [
 ]
 
 
-SECTOR_STYLE_FX_UNIVERSE = [
+SECTOR_STYLE_UNIVERSE = [
     'XLC',
     'XLP',
     'XLY',
@@ -79,7 +79,7 @@ SECTOR_STYLE_FX_UNIVERSE = [
     'TLT',
     "RPG", # Pure growth
     "RPV", # Pure value',
-    "XMMO", # Mid cap momentum
+
     'GLD'
 ]
 
@@ -90,7 +90,19 @@ INVESCO_EQUAL_WEIGHT_ETF = [
 
 
 VANGUARD_SECTOR_ETF = [
-"VDE","VFH","VOX",'VNQ',"VAW","VPU","VDC","VIS","VHT","VCR","VGT","TLT","GLD"
+"VDE",
+"VFH",
+"VOX",
+'VNQ',
+"VAW",
+"VPU",
+"VDC",
+"VIS",
+"VHT",
+"VCR",
+"VGT",
+"TLT",
+"GLD"
 ],
 
 
@@ -116,56 +128,56 @@ INVESCO_STYLE_ETF = [
   "TLT"
 ]
 
-# UNIVERSE= [
-#     # 'INCY' ,
-#     # 'WELL',
-#     # 'XOM',
-#     'AOS',
-#     'KHC',
-#     'COP',
-#     'KHC' ,
-#     'DISH',
-#     'IRM',
-#     'DISCK',
-#     'AFL',
-#     'PRGO' ,
-#     'GPC' ,
-#     'CAH' ,
-#     # 'MRO',
-#     # 'PEP',
-#     # 'GILD',
-#     # 'IVZ' ,
-#     # 'NOV',
-#     # 'L',
-#     # 'MO' ,
-#     # 'LB' ,
-#     # 'RCL' ,
-#     # 'CHD',
-#     'IFF',
-#     'PSA',
-#     'UAL',
-#     'JCI' ,
-#     'KIM' ,
-#     'DVN',
-#    'MMM' ,
-#     'DAL' ,
-#     'DGX',
-#     'SPG',
-#     'GE',
-#     'IRM',
-#     'SPG' ,
-#     'KHC' ,
-#     'HII',
-#     'RL',
-#     'ESS',
-#     'NCLH' ,
-#     'JBHT' ,
-#     'DLTR',
-#     'CCL',
-#     'TLT',
-#     'GLD'
+RANDOM_STOCKS= [
+    # 'INCY' ,
+    # 'WELL',
+    # 'XOM',
+    'AOS',
+    'KHC',
+    'COP',
+    'KHC' ,
+    'DISH',
+    'IRM',
+    'DISCK',
+    'AFL',
+    'PRGO' ,
+    'GPC' ,
+    'CAH' ,
+    # 'MRO',
+    # 'PEP',
+    # 'GILD',
+    # 'IVZ' ,
+    # 'NOV',
+    # 'L',
+    # 'MO' ,
+    # 'LB' ,
+    # 'RCL' ,
+    # 'CHD',
+    'IFF',
+    'PSA',
+    'UAL',
+    'JCI' ,
+    'KIM' ,
+    'DVN',
+   'MMM' ,
+    'DAL' ,
+    'DGX',
+    'SPG',
+    'GE',
+    'IRM',
+    'SPG' ,
+    'KHC' ,
+    'HII',
+    'RL',
+    'ESS',
+    'NCLH' ,
+    'JBHT' ,
+    'DLTR',
+    'CCL',
+    'TLT',
+    'GLD'
 
-#  ]
+ ]
 
 # UNIVERSE =[
 # 'NYC',

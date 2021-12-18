@@ -16,7 +16,8 @@ from universe_11 import (
     INVESCO_STYLE_ETF,
     VANGUARD_SECTOR_ETF,
     VANGUARD_STYLE_ETF,
-    SECTOR_STYLE_FX_UNIVERSE
+    SECTOR_STYLE_UNIVERSE,
+    RANDOM_STOCKS
 )
 
 from loguru import logger
@@ -62,14 +63,16 @@ class Strategy(bt.Strategy):
     params = dict(
         momentum=Momentum,  # parametrize the momentum and its period
         long_momentum_period=90,
-        max_stocks=2,
+        max_stocks=3,
         movav=bt.ind.SMA,  # parametrize the moving average and its periods
+        spy_risk_ma = 200,
+        ticker_uptrend_ma = 150,
         # See here - https://www.investopedia.com/ask/answers/122214/what-does-end-quarter-mean-portfolio-management.asp
-        # rebalance_months = [1,2,3,4,5,6,7,8,9,10,11,12],
+     #   rebalance_months = [1,2,3,4,5,6,7,8,9,10,11,12],
         rebalance_months=[1, 4, 7, 10],
         profit_take_pct=0.3,
-        stop_loss_pct=-0.25
-        # rebalance_months = [2,5,8,11]
+        stop_loss_pct=-0.25,
+     #   rebalance_months = [2,5,8,11]
     )
 
     def __init__(self):
@@ -78,7 +81,7 @@ class Strategy(bt.Strategy):
         self.spy = self.datas[0]
         self.stocks = self.datas[1:]
 
-        self.spy_sma200 = self.p.movav(self.spy.close, period=200)
+        self.spy_sma200 = self.p.movav(self.spy.close, period=self.p.spy_risk_ma)
 
        # self.spy_sma50 = self.p.movav(self.spy.close, period=50)
         self.safe_assets = [d for d in self.stocks if d._name in [
@@ -97,7 +100,7 @@ class Strategy(bt.Strategy):
             self.inds[d]["long_momentum"] = Momentum(
                 d.close, period=self.p.long_momentum_period
             )
-            self.inds[d]["sma200"] = bt.indicators.SMA(d.close, period=200)
+            self.inds[d]["sma200"] = bt.indicators.EMA(d.close, period=self.p.ticker_uptrend_ma)
             self.inds[d]["pct_change1"] = bt.indicators.PercentChange(
                 d.close, period=1)
 
@@ -293,10 +296,13 @@ class Strategy(bt.Strategy):
 
 if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
-  #  universe = INVESCO_STYLE_ETF
+    universe = INVESCO_STYLE_ETF
     #universe = VANGUARD_STYLE_ETF
-    universe = EXTENDED_UNIVERSE
-    #universe = INVESCO_EQUAL_WEIGHT_ETF
+  #  universe =BASIC_SECTOR_UNIVERSE
+    #universe = SECTOR_STYLE_UNIVERSE
+    #universe = EXTENDED_UNIVERSE
+    #universe = RANDOM_STOCKS
+   # universe = INVESCO_EQUAL_WEIGHT_ETF
     cerebro = bt.Cerebro()
     cerebro.broker.setcash(100000.0)
 
@@ -310,9 +316,10 @@ if __name__ == "__main__":
     cerebro.broker.set_checksubmit(checksubmit=False)
 
     data_dict = get_data(symbols=["SPY"] + universe)
+    #from_date = datetime.datetime(1999, 12, 15)
     from_date = datetime.datetime(2005, 12, 15)
-    #to_date = datetime.datetime(2020,2,17)
-    to_date = datetime.datetime.now()
+    to_date = datetime.datetime(2020,2,17)
+   # to_date = datetime.datetime.now()
 
     # spy_data = get_single_ticker_data_from_file(
     #     file_name="./mretf/backtrader/data/SPY.csv"
@@ -356,7 +363,7 @@ if __name__ == "__main__":
     print("Starting Portfolio Value: %.2f" % cerebro.broker.getvalue())
 
     cerebro.addstrategy(Strategy)
-    # cerebro.addstrategy(BuyAndHold_1)
+   # cerebro.addstrategy(BuyAndHold_1)
     results = cerebro.run()
 
     print(
