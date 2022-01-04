@@ -70,6 +70,7 @@ class Strategy(bt.Strategy):
         # See here - https://www.investopedia.com/ask/answers/122214/what-does-end-quarter-mean-portfolio-management.asp
      #   rebalance_months = [1,2,3,4,5,6,7,8,9,10,11,12],
         rebalance_months=[1, 4, 7, 10],
+        #rebalance_months=[3, 6, 9, 12],
         profit_take_pct=0.3,
         stop_loss_pct=-0.25,
      #   rebalance_months = [2,5,8,11]
@@ -107,7 +108,7 @@ class Strategy(bt.Strategy):
         self.add_timer(
             name="rebalance",
             when=bt.timer.SESSION_START,
-            monthdays=[1],
+            monthdays=[1], #[30]
             monthcarry=True,
             cheat=False,
         )
@@ -219,15 +220,19 @@ class Strategy(bt.Strategy):
 
         else:
             all_valid_etfs = [
-                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1]
-            ]  # self.d_with_len #
+                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1]] #  and self.inds[d]["long_momentum"][0]>0.8]
+            #]  # self.d_with_len #
 
         top_long_momentums = sorted(
             all_valid_etfs, key=lambda d: self.inds[d]["long_momentum"][0], reverse=True
-        )[: self.p.max_stocks]
+        )[: self.p.max_stocks+2]
+        
+        momentum_values = [f"{d._name}:{self.inds[d]['long_momentum'][0]:.3f}" for d in top_long_momentums]
+        
+        print(f"MOMENTUM VALUES: {', '.join(momentum_values)}")
         # top_long_momentums = [d for d in top_long_momentums if d not in negative_short_momentums][:self.p.max_stocks]
 
-        self.buy_positions = top_long_momentums
+        self.buy_positions = top_long_momentums[:self.p.max_stocks]
 
         sell_positions = [d for d in posdata if d not in self.buy_positions]
         for d in sell_positions:
@@ -296,11 +301,11 @@ class Strategy(bt.Strategy):
 
 if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
-    universe = INVESCO_STYLE_ETF
+    #universe = INVESCO_STYLE_ETF
     #universe = VANGUARD_STYLE_ETF
   #  universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
-    #universe = EXTENDED_UNIVERSE
+    universe = EXTENDED_UNIVERSE
     #universe = RANDOM_STOCKS
    # universe = INVESCO_EQUAL_WEIGHT_ETF
     cerebro = bt.Cerebro()
@@ -318,8 +323,8 @@ if __name__ == "__main__":
     data_dict = get_data(symbols=["SPY"] + universe)
     #from_date = datetime.datetime(1999, 12, 15)
     from_date = datetime.datetime(2005, 12, 15)
-    to_date = datetime.datetime(2020,2,17)
-   # to_date = datetime.datetime.now()
+   # to_date = datetime.datetime(2020,2,17)
+    to_date = datetime.datetime.now()
 
     # spy_data = get_single_ticker_data_from_file(
     #     file_name="./mretf/backtrader/data/SPY.csv"
