@@ -194,14 +194,7 @@ class Strategy(bt.Strategy):
                         self.order_target_percent(d, target=pct_allocation)
                     #    position.update_target_price(current_price=current_price)
                         position.update_target_price(current_price=position.asset_target_price)
-                        self.log(f"\t\tOrdering: {d._name}: Price: {d[0]:.2f}, Weight: {pct_allocation:.2f}")
-                    # elif (current_price / position.asset_target_price - 1.0) < -0.1:
-                    #     position.asset_target_price =self.buy_price[d] * 0.95
-                    #     self.log(f"\t\tLowering target price for {d._name}: {position.asset_target_price}")
-
-                        
-                      #  self.log(f"\t\t\tSetting new purchase target for {d._name}:  {position.asset_target_price:.2f}")
-                    
+                        self.log(f"\t\tPosition Ordering: {d._name}: Price: {d[0]:.2f}, Weight: {pct_allocation:.2f}")
                 except EmptyPositionQueueException:
                     self.positioning_queue.pop(d, None) # All purchased, remove key
     
