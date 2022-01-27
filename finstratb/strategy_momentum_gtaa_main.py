@@ -303,11 +303,11 @@ if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = INVESCO_STYLE_ETF
     #universe = VANGUARD_STYLE_ETF
-  #  universe =BASIC_SECTOR_UNIVERSE
+   # universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
     universe = EXTENDED_UNIVERSE
     #universe = RANDOM_STOCKS
-   # universe = INVESCO_EQUAL_WEIGHT_ETF
+    #universe = INVESCO_EQUAL_WEIGHT_ETF
     cerebro = bt.Cerebro()
     cerebro.broker.setcash(100000.0)
 
@@ -321,7 +321,7 @@ if __name__ == "__main__":
     cerebro.broker.set_checksubmit(checksubmit=False)
 
     data_dict = get_data(symbols=["SPY"] + universe)
-    #from_date = datetime.datetime(1999, 12, 15)
+    ##from_date = datetime.datetime(1999, 12, 15)
     from_date = datetime.datetime(2005, 12, 15)
    # to_date = datetime.datetime(2020,2,17)
     to_date = datetime.datetime.now()

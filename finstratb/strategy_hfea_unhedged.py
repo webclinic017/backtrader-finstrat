@@ -162,7 +162,7 @@ if __name__ == "__main__":
             bt.feeds.PandasData(
                 dataname=data,
                 fromdate=datetime.datetime(2009, 12, 15),
-                todate=datetime.datetime(2021,11,30),
+                todate=datetime.datetime.now(),
                 name=symbol,
                 plot = False
             )
