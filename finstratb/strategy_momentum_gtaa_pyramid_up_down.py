@@ -77,11 +77,11 @@ class Strategy(bt.Strategy):
      #   rebalance_months = [1,2,3,4,5,6,7,8,9,10,11,12],
         rebalance_months=[1, 4, 7, 10],
         #rebalance_months=[3, 6, 9, 12],
-        profit_take_pct=0.3,
+        profit_take_pct=0.8,
         stop_loss_pct=-0.25,
         pyramid_step_pct_increase = 0.01,
         pyramid_n_steps = 2,
-        pyramiddown_upside_start_sell_pct = 20,
+        pyramiddown_upside_start_sell_pct = 30,
         pyramiddown_upside_stop_sell_pct = 10,
         pyramiddown_n_steps = 5
         
@@ -391,11 +391,11 @@ class Strategy(bt.Strategy):
 
 if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
-    #universe = INVESCO_STYLE_ETF
+    universe = INVESCO_STYLE_ETF
     #universe = VANGUARD_STYLE_ETF
     #universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
-    universe = EXTENDED_UNIVERSE
+  #  universe = EXTENDED_UNIVERSE
     #universe = RANDOM_STOCKS
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = HFEA_UNIVERSE
