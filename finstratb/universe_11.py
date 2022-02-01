@@ -64,6 +64,14 @@ BASIC_SECTOR_UNIVERSE = [
 ]
 
 
+HFEA_UNIVERSE = [
+    'UPRO',
+    'TMF',
+    'TLT',
+    'GLD'
+]
+
+
 SECTOR_STYLE_UNIVERSE = [
     'XLC',
     'XLP',

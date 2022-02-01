@@ -1,4 +1,4 @@
-""" This strategy uses the momentum logic from GTAA main, however uses pyramiding technique for positions
+""" This strategy uses the momentum logic from GTAA main, however uses pyramid technique on the way up and down.
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -31,7 +31,7 @@ from finstratb.misc.helpers import (
     get_single_ticker_data_from_file,
 )
 from finstratb.misc.momentum import Momentum
-from finstratb.misc.positioning import PyramidPositioning, EmptyPositionQueueException
+from finstratb.misc.positioning import PyramidPositioning, EmptyPositionQueueException, PyramidDownPositioning
 import collections
 import quantstats
 
@@ -80,7 +80,11 @@ class Strategy(bt.Strategy):
         profit_take_pct=0.3,
         stop_loss_pct=-0.25,
         pyramid_step_pct_increase = 0.01,
-        pyramid_n_steps = 2
+        pyramid_n_steps = 2,
+        pyramiddown_upside_start_sell_pct = 20,
+        pyramiddown_upside_stop_sell_pct = 10,
+        pyramiddown_n_steps = 5
+        
      #   rebalance_months = [2,5,8,11]
     )
 
@@ -105,6 +109,7 @@ class Strategy(bt.Strategy):
         self.skip_hedge = False
         self.is_downtrend = False
         self.positioning_queue = {}
+        self.pyramiddown_positioning_queue = {}
         self.open_orders = {}
 
         for d in self.stocks:
@@ -202,11 +207,26 @@ class Strategy(bt.Strategy):
                         self.log(f"\t\tPosition Ordering: {d._name}: Price: {d[0]:.2f}, Weight: {pct_allocation:.2f}")
                 except EmptyPositionQueueException:
                     self.positioning_queue.pop(d, None) # All purchased, remove key
+
+    
+    def sell_assets_in_queue(self):
+        if self.pyramiddown_positioning_queue:
+            for d, position in self.pyramiddown_positioning_queue.items():
+                if d in self.positioning_queue: # still purchasing this asset
+                    continue
+                current_price = d[0]
+                pct_allocation = position.update_allocation(asset_current_price = current_price)
+                if pct_allocation >= 0:
+                    self.order_target_percent(d, target=pct_allocation)
+                    self.log(f"\t\tStep Down Pyramid Ordering: {d._name}: Price: {d[0]:.2f}, Weight: {pct_allocation:.2f}")
+            
+    
     
     def next(self):
         # pass
         
         self.purchase_assets_in_queue()
+        self.sell_assets_in_queue()
 
         posdata = [d for d, pos in self.getpositions().items() if pos]
 
@@ -225,6 +245,7 @@ class Strategy(bt.Strategy):
                 )
                 self.close(d)
                 self.positioning_queue.pop(d, None)
+                self.pyramiddown_positioning_queue.pop(d, None)
                 continue
 
             if d in self.trailing_price and (d.close[-1] / self.trailing_price[d] - 1.0 < self.p.stop_loss_pct):
@@ -232,6 +253,7 @@ class Strategy(bt.Strategy):
                     f"RISK MANAGEMENT: TRAILING STOP LOSS for {d._name}, price: {d[-1]:.2f}")
                 self.close(d)
                 self.positioning_queue.pop(d, None)
+                self.pyramiddown_positioning_queue.pop(d, None)
                 continue
 
     def rebalance_portfolio(self, recovery_mode=False):
@@ -273,14 +295,13 @@ class Strategy(bt.Strategy):
             self.log(f"Exiting position: {d._name}: {d[0]:.2f}")
             self.order_target_percent(d, target=0.0)
             # self.buy_price.pop(d, None)
-        #    self.positioning_queue.pop(d, None)
+            #self.positioning_queue.pop(d, None)
+            #self.pyramiddown_positioning_queue.pop(d, None)
         #   self.trailing_prices.pop(d)
         # self.rebalance_sell_date = self.datas[0].datetime[0]
 
-        
-        # Reseet positioning queue
         self.positioning_queue = {d: self.positioning_queue[d] for d in self.positioning_queue if d in self.buy_positions}
-        
+        self.pyramiddown_positioning_queue = {d: self.pyramiddown_positioning_queue[d] for d in self.pyramiddown_positioning_queue if d in self.buy_positions}
         
         if self.buy_positions:
 
@@ -300,13 +321,19 @@ class Strategy(bt.Strategy):
                                                             step_pct_increase=self.p.pyramid_step_pct_increase, n_steps = self.p.pyramid_n_steps)
                     
                     self.positioning_queue[d] = position_allocation
+                    self.pyramiddown_positioning_queue[d] = PyramidDownPositioning(d, buy_price = d.close[0], full_allocation_pct=0.95*w,
+                                            upside_start_sell_pct=self.p.pyramiddown_upside_start_sell_pct,
+                                            upside_finish_sell_pct=self.p.pyramiddown_upside_stop_sell_pct,
+                                            steps_down= self.p.pyramiddown_n_steps
+                                            )
+   
                     self.buy_price[d] = d.close[0]
                     self.trailing_price[d] = d.close[0]
 
 
                 elif d not in self.positioning_queue: # just rebalance if asset is fully positioned
                 
-                    o = self.order_target_percent(d, target=0.95 * w)
+                    o = self.order_target_percent(d, target=0.98 * w)
                 #self.buy_price[d] = d.close[0]
                 #self.trailing_price[d] = d.close[0]
 
@@ -450,5 +477,5 @@ if __name__ == "__main__":
     returns.index = returns.index.tz_convert(None)
 
     quantstats.reports.html(returns, benchmark="SPY",
-                            output="results/rotation_stats_gtaa_pyramiding.html")
+                            output="results/rotation_stats_gtaa_pyramid_up_down.html")
     cerebro.plot(iplot=False)[0][0]
