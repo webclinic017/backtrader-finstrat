@@ -23,11 +23,26 @@ class PyramidPositioning:
     def get_allocation(self, asset_current_price: float) -> float:
         if len(self._pct_queue) == 0:
             raise EmptyPositionQueueException("No allocation budget left.")
-            
+        
+
         if asset_current_price >= self.asset_target_price:
             return self._pct_queue.popleft()
         return 0.0
+    
+    def pop_allocation(self):
+        """Pops allocation without checking current price (using this class as a simple queue)
 
+        Raises:
+            EmptyPositionQueueException: [description]
+
+        Returns:
+            [type]: [description]
+        """
+        if len(self._pct_queue) == 0:
+            raise EmptyPositionQueueException("No allocation budget left.")
+        
+        return self._pct_queue.popleft()
+        
     def update_target_price(self, current_price: float) -> None:
         self.asset_target_price = self._get_new_target_price(
             current_price)
@@ -69,14 +84,6 @@ class PyramidDownPositioning:
         
         return -1.0
             
-        
-        
-    
-        
-        
-    
-        
-    
     
 
 if __name__ == "__main__":

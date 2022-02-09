@@ -9,7 +9,7 @@ import pandas as pd
 import backtrader as bt
 import datetime
 
-from universe_11 import (
+from finstratb.universe_11 import (
     EXTENDED_UNIVERSE,
     BASIC_SECTOR_UNIVERSE, 
     INVESCO_EQUAL_WEIGHT_ETF, 

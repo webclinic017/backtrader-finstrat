@@ -1,4 +1,5 @@
-""" This strategy uses the momentum logic from GTAA main, however uses pyramid technique on the way up and down.
+""" This strategy uses the momentum logic from GTAA main, uses pyramid technique for positions
+The strategy also uses absolute stop/loss positions
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -21,7 +22,8 @@ from universe_11 import (
     VANGUARD_STYLE_ETF,
     SECTOR_STYLE_UNIVERSE,
     RANDOM_STOCKS,
-    HFEA_UNIVERSE
+    HFEA_UNIVERSE,
+    CE_UNIVERSE
 )
 
 from loguru import logger
@@ -31,7 +33,7 @@ from finstratb.misc.helpers import (
     get_single_ticker_data_from_file,
 )
 from finstratb.misc.momentum import Momentum
-from finstratb.misc.positioning import PyramidPositioning, EmptyPositionQueueException, PyramidDownPositioning
+from finstratb.misc.positioning import PyramidPositioning, EmptyPositionQueueException
 import collections
 import quantstats
 
@@ -77,14 +79,14 @@ class Strategy(bt.Strategy):
      #   rebalance_months = [1,2,3,4,5,6,7,8,9,10,11,12],
         rebalance_months=[1, 4, 7, 10],
         #rebalance_months=[3, 6, 9, 12],
-        profit_take_pct=0.8,
+        # These are trailing stop-loss parameters
+        profit_take_pct=0.3,
         stop_loss_pct=-0.25,
         pyramid_step_pct_increase = 0.01,
         pyramid_n_steps = 2,
-        pyramiddown_upside_start_sell_pct = 30,
-        pyramiddown_upside_stop_sell_pct = 10,
-        pyramiddown_n_steps = 5
+        absolute_stop_loss_default = -0.15,
         
+        absolute_stop_loss_tresholds = [ (0.2, 0.0),]
      #   rebalance_months = [2,5,8,11]
     )
 
@@ -109,7 +111,6 @@ class Strategy(bt.Strategy):
         self.skip_hedge = False
         self.is_downtrend = False
         self.positioning_queue = {}
-        self.pyramiddown_positioning_queue = {}
         self.open_orders = {}
 
         for d in self.stocks:
@@ -207,30 +208,16 @@ class Strategy(bt.Strategy):
                         self.log(f"\t\tPosition Ordering: {d._name}: Price: {d[0]:.2f}, Weight: {pct_allocation:.2f}")
                 except EmptyPositionQueueException:
                     self.positioning_queue.pop(d, None) # All purchased, remove key
-
-    
-    def sell_assets_in_queue(self):
-        if self.pyramiddown_positioning_queue:
-            for d, position in self.pyramiddown_positioning_queue.items():
-                if d in self.positioning_queue: # still purchasing this asset
-                    continue
-                current_price = d[0]
-                pct_allocation = position.update_allocation(asset_current_price = current_price)
-                if pct_allocation >= 0:
-                    self.order_target_percent(d, target=pct_allocation)
-                    self.log(f"\t\tStep Down Pyramid Ordering: {d._name}: Price: {d[0]:.2f}, Weight: {pct_allocation:.2f}")
-            
-    
     
     def next(self):
         # pass
         
         self.purchase_assets_in_queue()
-        self.sell_assets_in_queue()
 
         posdata = [d for d, pos in self.getpositions().items() if pos]
 
         for d in posdata:
+            
 
             if (
                 d.close[-1] >= self.trailing_price[d]
@@ -245,7 +232,6 @@ class Strategy(bt.Strategy):
                 )
                 self.close(d)
                 self.positioning_queue.pop(d, None)
-                self.pyramiddown_positioning_queue.pop(d, None)
                 continue
 
             if d in self.trailing_price and (d.close[-1] / self.trailing_price[d] - 1.0 < self.p.stop_loss_pct):
@@ -253,8 +239,34 @@ class Strategy(bt.Strategy):
                     f"RISK MANAGEMENT: TRAILING STOP LOSS for {d._name}, price: {d[-1]:.2f}")
                 self.close(d)
                 self.positioning_queue.pop(d, None)
-                self.pyramiddown_positioning_queue.pop(d, None)
                 continue
+            
+            if d in self.trailing_price:
+                abs_stop_loss_d = self.p.absolute_stop_loss_default
+                                    
+                                    
+                max_trailing_profit = self.trailing_price[d] / d.close[-1]  - 1.0 
+                for profit_threshold, sloss in self.p.absolute_stop_loss_tresholds:
+                    #print(max_trailing_profit, profit_threshold, sloss)
+
+                    if max_trailing_profit >= profit_threshold:
+                        # self.log(
+                        #     f"RISK MANAGEMENT: SETTING NEW STOP LOSS FOR {d._name}, level: {sloss:.2f}"
+                        # )
+                        abs_stop_loss_d = sloss
+                                                                   
+                if (d.close[-1] / self.buy_price[d] -1.0) <= abs_stop_loss_d:
+                    self.log(
+                        f"RISK MANAGEMENT: ABSOLUTE STOP LOSS for {d._name}, price: {d[-1]:.2f}"
+                    )
+                    self.close(d)
+                    self.positioning_queue.pop(d, None)
+                    continue
+                
+
+                    
+            
+            
 
     def rebalance_portfolio(self, recovery_mode=False):
         # only look at data that we can have indicators for
@@ -295,13 +307,14 @@ class Strategy(bt.Strategy):
             self.log(f"Exiting position: {d._name}: {d[0]:.2f}")
             self.order_target_percent(d, target=0.0)
             # self.buy_price.pop(d, None)
-            #self.positioning_queue.pop(d, None)
-            #self.pyramiddown_positioning_queue.pop(d, None)
+        #    self.positioning_queue.pop(d, None)
         #   self.trailing_prices.pop(d)
         # self.rebalance_sell_date = self.datas[0].datetime[0]
 
+        
+        # Reseet positioning queue
         self.positioning_queue = {d: self.positioning_queue[d] for d in self.positioning_queue if d in self.buy_positions}
-        self.pyramiddown_positioning_queue = {d: self.pyramiddown_positioning_queue[d] for d in self.pyramiddown_positioning_queue if d in self.buy_positions}
+        
         
         if self.buy_positions:
 
@@ -321,19 +334,14 @@ class Strategy(bt.Strategy):
                                                             step_pct_increase=self.p.pyramid_step_pct_increase, n_steps = self.p.pyramid_n_steps)
                     
                     self.positioning_queue[d] = position_allocation
-                    self.pyramiddown_positioning_queue[d] = PyramidDownPositioning(d, buy_price = d.close[0], full_allocation_pct=0.95*w,
-                                            upside_start_sell_pct=self.p.pyramiddown_upside_start_sell_pct,
-                                            upside_finish_sell_pct=self.p.pyramiddown_upside_stop_sell_pct,
-                                            steps_down= self.p.pyramiddown_n_steps
-                                            )
-   
                     self.buy_price[d] = d.close[0]
                     self.trailing_price[d] = d.close[0]
 
 
                 elif d not in self.positioning_queue: # just rebalance if asset is fully positioned
                 
-                    o = self.order_target_percent(d, target=0.98 * w)
+                    o = self.order_target_percent(d, target=0.95 * w)
+              #      self.trailing_price[d] = d.close[0]
                 #self.buy_price[d] = d.close[0]
                 #self.trailing_price[d] = d.close[0]
 
@@ -393,10 +401,11 @@ if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     universe = INVESCO_STYLE_ETF
     #universe = VANGUARD_STYLE_ETF
-    #universe =BASIC_SECTOR_UNIVERSE
+  #  universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
-  #  universe = EXTENDED_UNIVERSE
-    #universe = RANDOM_STOCKS
+    universe = EXTENDED_UNIVERSE
+    # universe = CE_UNIVERSE
+  #  universe = RANDOM_STOCKS
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = HFEA_UNIVERSE
     cerebro = bt.Cerebro()
@@ -477,5 +486,5 @@ if __name__ == "__main__":
     returns.index = returns.index.tz_convert(None)
 
     quantstats.reports.html(returns, benchmark="SPY",
-                            output="results/rotation_stats_gtaa_pyramid_up_down.html")
+                            output="results/rotation_stats_gtaa_pyramiding_absstoploss.html")
     cerebro.plot(iplot=False)[0][0]

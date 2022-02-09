@@ -60,7 +60,8 @@ BASIC_SECTOR_UNIVERSE = [
     'XLU',
     'XLRE',
     'TLT',
-    'GLD'
+    'GLD',
+ #   'UPRO'
 ]
 
 
@@ -71,6 +72,27 @@ HFEA_UNIVERSE = [
     'GLD'
 ]
 
+CE_UNIVERSE = [
+    'URA',
+    'EURN',
+    'PAM',
+    'SWN',
+    'RRC',
+    'EQT',
+    'CNX',
+    'AR',
+    'GLD',
+    'TLT',
+    'ARCH',
+    'ADM',
+    'ICL',
+    'NTR',
+    'VSTO',
+    'VALE',
+    'FTI'
+    
+    
+]
 
 SECTOR_STYLE_UNIVERSE = [
     'XLC',

@@ -1,4 +1,7 @@
-""" This strategy uses the momentum logic from GTAA main, however uses pyramiding technique for positions
+""" This strategy uses the momentum logic from GTAA main, however uses pyramiding technique for positions using moving average rather than fixed percentage
+Based on ideas from - https://bastion.substack.com/p/improving-the-stop-loss
+
+This strategy shows superior returns to constant pyramid strategy, but with larger drawdowns and slightly reduced Sharpe ratios.
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -73,6 +76,7 @@ class Strategy(bt.Strategy):
         movav=bt.ind.SMA,  # parametrize the moving average and its periods
         spy_risk_ma = 200,
         ticker_uptrend_ma = 150,
+        ticker_short_ma = 50,
         # See here - https://www.investopedia.com/ask/answers/122214/what-does-end-quarter-mean-portfolio-management.asp
      #   rebalance_months = [1,2,3,4,5,6,7,8,9,10,11,12],
         rebalance_months=[1, 4, 7, 10],
@@ -80,7 +84,7 @@ class Strategy(bt.Strategy):
         profit_take_pct=0.3,
         stop_loss_pct=-0.25,
         pyramid_step_pct_increase = 0.01,
-        pyramid_n_steps = 2
+        pyramid_n_steps = 4
      #   rebalance_months = [2,5,8,11]
     )
 
@@ -112,6 +116,7 @@ class Strategy(bt.Strategy):
                 d.close, period=self.p.long_momentum_period
             )
             self.inds[d]["sma200"] = bt.indicators.EMA(d.close, period=self.p.ticker_uptrend_ma)
+            self.inds[d]["sma_short"] = bt.indicators.EMA(d.close, period=self.p.ticker_short_ma)
             self.inds[d]["pct_change1"] = bt.indicators.PercentChange(
                 d.close, period=1)
 
@@ -194,11 +199,11 @@ class Strategy(bt.Strategy):
             for d, position in temp_queue:
                 current_price = d[0]
                 try:
-                    pct_allocation = position.get_allocation(asset_current_price = current_price)
-                    if pct_allocation > 0 and d._name not in self.open_orders:
+                    if current_price >= self.inds[d]["sma_short"][-1]:
+                        
+                        pct_allocation = position.pop_allocation()
                         self.order_target_percent(d, target=pct_allocation)
                     #    position.update_target_price(current_price=current_price)
-                        position.update_target_price(current_price=position.asset_target_price)
                         self.log(f"\t\tPosition Ordering: {d._name}: Price: {d[0]:.2f}, Weight: {pct_allocation:.2f}")
                 except EmptyPositionQueueException:
                     self.positioning_queue.pop(d, None) # All purchased, remove key
@@ -364,12 +369,12 @@ class Strategy(bt.Strategy):
 
 if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
-    #universe = INVESCO_STYLE_ETF
+    universe = INVESCO_STYLE_ETF
     #universe = VANGUARD_STYLE_ETF
     #universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
-    universe = EXTENDED_UNIVERSE
-    #universe = RANDOM_STOCKS
+    #universe = EXTENDED_UNIVERSE
+   # universe = RANDOM_STOCKS
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = HFEA_UNIVERSE
     cerebro = bt.Cerebro()
@@ -450,5 +455,5 @@ if __name__ == "__main__":
     returns.index = returns.index.tz_convert(None)
 
     quantstats.reports.html(returns, benchmark="SPY",
-                            output="results/rotation_stats_gtaa_pyramiding.html")
+                            output="results/rotation_stats_gtaa_pyramiding_ma.html")
     cerebro.plot(iplot=False)[0][0]
