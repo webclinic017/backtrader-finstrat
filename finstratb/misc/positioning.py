@@ -13,6 +13,7 @@ class PyramidPositioning:
         self.asset_total_target_pct = asset_total_target_pct
         self.step_pct_increase = step_pct_increase
         self.n_steps = n_steps
+        self.delay_buy = False
 
         # Generate target price for first buy
         self.asset_target_price = self._get_new_target_price(

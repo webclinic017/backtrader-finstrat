@@ -76,7 +76,9 @@ class Strategy(bt.Strategy):
         movav=bt.ind.SMA,  # parametrize the moving average and its periods
         spy_risk_ma = 200,
         ticker_uptrend_ma = 150,
-        ticker_short_ma = 50,
+        ticker_ma_crossover_short = 20,
+        ticker_ma_crossover_long = 50,
+        
         # See here - https://www.investopedia.com/ask/answers/122214/what-does-end-quarter-mean-portfolio-management.asp
      #   rebalance_months = [1,2,3,4,5,6,7,8,9,10,11,12],
         rebalance_months=[1, 4, 7, 10],
@@ -116,7 +118,8 @@ class Strategy(bt.Strategy):
                 d.close, period=self.p.long_momentum_period
             )
             self.inds[d]["sma200"] = bt.indicators.EMA(d.close, period=self.p.ticker_uptrend_ma)
-            self.inds[d]["sma_short"] = bt.indicators.EMA(d.close, period=self.p.ticker_short_ma)
+            self.inds[d]["sma_crossover_short"] = bt.indicators.EMA(d.close, period=self.p.ticker_ma_crossover_short)
+            self.inds[d]["sma_crossover_long"] = bt.indicators.EMA(d.close, period=self.p.ticker_ma_crossover_long)
             self.inds[d]["pct_change1"] = bt.indicators.PercentChange(
                 d.close, period=1)
 
@@ -197,9 +200,9 @@ class Strategy(bt.Strategy):
         if self.positioning_queue:
             temp_queue = [(d, position) for d, position in self.positioning_queue.items()] # Since we can't update the original queue during iteration
             for d, position in temp_queue:
-                current_price = d[0]
+                #current_price = d[0]
                 try:
-                    if current_price >= self.inds[d]["sma_short"][-1]:
+                    if self.inds[d]["sma_crossover_short"][-1] >= self.inds[d]["sma_crossover_long"][-1]:
                         
                         pct_allocation = position.pop_allocation()
                         self.order_target_percent(d, target=pct_allocation)
@@ -371,9 +374,9 @@ if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     universe = INVESCO_STYLE_ETF
     #universe = VANGUARD_STYLE_ETF
-    #universe =BASIC_SECTOR_UNIVERSE
+    universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
-    universe = EXTENDED_UNIVERSE
+    #universe = EXTENDED_UNIVERSE
    # universe = RANDOM_STOCKS
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = HFEA_UNIVERSE

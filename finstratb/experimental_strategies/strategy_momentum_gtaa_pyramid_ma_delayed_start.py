@@ -84,7 +84,7 @@ class Strategy(bt.Strategy):
         profit_take_pct=0.3,
         stop_loss_pct=-0.25,
         pyramid_step_pct_increase = 0.01,
-        pyramid_n_steps = 4
+        pyramid_n_steps = 2
      #   rebalance_months = [2,5,8,11]
     )
 
@@ -199,12 +199,18 @@ class Strategy(bt.Strategy):
             for d, position in temp_queue:
                 current_price = d[0]
                 try:
-                    if current_price >= self.inds[d]["sma_short"][-1]:
-                        
-                        pct_allocation = position.pop_allocation()
-                        self.order_target_percent(d, target=pct_allocation)
-                    #    position.update_target_price(current_price=current_price)
-                        self.log(f"\t\tPosition Ordering: {d._name}: Price: {d[0]:.2f}, Weight: {pct_allocation:.2f}")
+                    
+                    if position.delay_buy and current_price >= self.inds[d]["sma_short"][-1]:
+                        position.delay_buy = False
+                        position.update_target_price(current_price)
+                    
+                    if not position.delay_buy:
+                        pct_allocation = position.get_allocation(asset_current_price = current_price)
+                        if pct_allocation > 0 and d._name not in self.open_orders:
+                            self.order_target_percent(d, target=pct_allocation)
+                        #    position.update_target_price(current_price=current_price)
+                            position.update_target_price(current_price=position.asset_target_price)
+                            self.log(f"\t\tPosition Ordering: {d._name}: Price: {d[0]:.2f}, Weight: {pct_allocation:.2f}")
                 except EmptyPositionQueueException:
                     self.positioning_queue.pop(d, None) # All purchased, remove key
     
@@ -304,6 +310,9 @@ class Strategy(bt.Strategy):
                     position_allocation = PyramidPositioning(d, asset_initial_price=d.close[0], asset_total_target_pct=0.95*w, 
                                                             step_pct_increase=self.p.pyramid_step_pct_increase, n_steps = self.p.pyramid_n_steps)
                     
+                    if d.close[0] <= self.inds[d]["sma_short"][-1]:
+                         position_allocation.delay_buy = True
+                    
                     self.positioning_queue[d] = position_allocation
                     self.buy_price[d] = d.close[0]
                     self.trailing_price[d] = d.close[0]
@@ -373,7 +382,7 @@ if __name__ == "__main__":
     #universe = VANGUARD_STYLE_ETF
     #universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
-    universe = EXTENDED_UNIVERSE
+    #universe = EXTENDED_UNIVERSE
    # universe = RANDOM_STOCKS
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = HFEA_UNIVERSE
@@ -455,5 +464,5 @@ if __name__ == "__main__":
     returns.index = returns.index.tz_convert(None)
 
     quantstats.reports.html(returns, benchmark="SPY",
-                            output="results/rotation_stats_gtaa_pyramiding_ma.html")
+                            output="results/rotation_stats_gtaa_pyramid_delayed_start.html")
     cerebro.plot(iplot=False)[0][0]
