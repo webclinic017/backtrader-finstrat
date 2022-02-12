@@ -39,7 +39,6 @@ import collections
 import quantstats
 
 
-
 class BuyAndHold_1(bt.Strategy):
     def __init__(self):
         # self.val_start = self.broker.get_cash()  # keep the starting cash
@@ -74,21 +73,22 @@ class Strategy(bt.Strategy):
         long_momentum_period=90,
         max_stocks=4,
         movav=bt.ind.SMA,  # parametrize the moving average and its periods
-        spy_risk_ma = 200,
-        ticker_uptrend_ma = 150,
-        ticker_short_ma = 50,
+        spy_risk_ma=200,
+        ticker_uptrend_ma=150,
+        ticker_short_ma=50,
         # See here - https://www.investopedia.com/ask/answers/122214/what-does-end-quarter-mean-portfolio-management.asp
-     #   rebalance_months = [1,2,3,4,5,6,7,8,9,10,11,12],
+        #   rebalance_months = [1,2,3,4,5,6,7,8,9,10,11,12],
         rebalance_months=[1, 4, 7, 10],
-        #rebalance_months=[3, 6, 9, 12],
+
         profit_take_pct=0.3,
         stop_loss_pct=-0.25,
-        
-        pyramid_step_pct_increase = 0.005,
-        pyramid_n_steps = 1,
-        bbands_period = 20,
-        bbands_devfactor=2
-     #   rebalance_months = [2,5,8,11]
+
+        # minimum price increase percentage for pyramid buy
+        pyramid_step_pct_increase=0.0025,
+        pyramid_n_steps=2,  # number of pyramid steps
+        bbands_period=20,  # bollinger bands look back period, used for purchase decision in the
+        bbands_devfactor=2  # historical std deviation factor for BB calculation
+
     )
 
     def __init__(self):
@@ -97,7 +97,8 @@ class Strategy(bt.Strategy):
         self.spy = self.datas[0]
         self.stocks = self.datas[1:]
 
-        self.spy_sma200 = self.p.movav(self.spy.close, period=self.p.spy_risk_ma)
+        self.spy_sma200 = self.p.movav(
+            self.spy.close, period=self.p.spy_risk_ma)
 
        # self.spy_sma50 = self.p.movav(self.spy.close, period=50)
         self.safe_assets = [d for d in self.stocks if d._name in [
@@ -118,15 +119,17 @@ class Strategy(bt.Strategy):
             self.inds[d]["long_momentum"] = Momentum(
                 d.close, period=self.p.long_momentum_period
             )
-            self.inds[d]["sma200"] = bt.indicators.EMA(d.close, period=self.p.ticker_uptrend_ma)
-            self.inds[d]['bband'] = bt.indicators.BBands(d.close, period=self.p.bbands_period, devfactor = self.p.bbands_devfactor)
+            self.inds[d]["sma200"] = bt.indicators.EMA(
+                d.close, period=self.p.ticker_uptrend_ma)
+            self.inds[d]['bband'] = bt.indicators.BBands(
+                d.close, period=self.p.bbands_period, devfactor=self.p.bbands_devfactor)
             self.inds[d]["pct_change1"] = bt.indicators.PercentChange(
                 d.close, period=1)
 
         self.add_timer(
             name="rebalance",
             when=bt.timer.SESSION_START,
-            monthdays=[1], #[30]
+            monthdays=[1],  # [30]
             monthcarry=True,
             cheat=False,
         )
@@ -157,6 +160,10 @@ class Strategy(bt.Strategy):
         self.next()
 
     def global_market_risk_hedge(self):
+        """Global risk hedge works on a monthly cadence:
+            If SPY's price < SMA200, market is in confirmed downtrend, switch to ALL to safe assets. Set downtrend to True
+            If SPY's price >= SMA200 and market was previously in downtrend, rebalance straight away, even before the official rebalance cadence.
+        """
 
         if self.spy.close[-1] >= self.spy_sma200[-1] or self.skip_hedge:
             if self.is_downtrend:
@@ -189,43 +196,54 @@ class Strategy(bt.Strategy):
         for d in self.safe_assets:
             self.order_target_percent(
                 d, target=self.safe_asset_weights[d._name])
-            
-            # self.positioning_queue[d] =  PyramidPositioning(d, asset_initial_price=d.close[0], asset_total_target_pct=self.safe_asset_weights[d._name], 
+
+            # self.positioning_queue[d] =  PyramidPositioning(d, asset_initial_price=d.close[0], asset_total_target_pct=self.safe_asset_weights[d._name],
             #                                                 step_pct_increase=self.p.pyramid_step_pct_increase, n_steps = self.p.pyramid_n_steps)
             self.buy_price[d] = d.close[0]
             self.trailing_price[d] = d.close[0]
 
-    
     def purchase_assets_in_queue(self):
+        """Function responsible for entering positions
+        """
+        
         if self.positioning_queue:
-            temp_queue = [(d, position) for d, position in self.positioning_queue.items()] # Since we can't update the original queue during iteration
+            # Since we can't update the original queue during iteration
+            temp_queue = [(d, position)
+                          for d, position in self.positioning_queue.items()]
             for d, position in temp_queue:
                 current_price = d[0]
                 try:
-                    
-                    #if position.delay_buy and (current_price <= self.inds[d]["bband"].lines.bot[-1] or current_price >= self.inds[d]["bband"].lines.mid[-1]):
+
+                    # if position.delay_buy and (current_price <= self.inds[d]["bband"].lines.bot[-1] or current_price >= self.inds[d]["bband"].lines.mid[-1]):
+                    # If price was in downtrend according to BB and price touched the bottom limit, allow to buy
                     if position.delay_buy and (current_price <= self.inds[d]["bband"].lines.bot[-1]):
                         position.delay_buy = False
-                        self.log(f"\t\tBollinger Band reached bottom. Updating target price: {d._name}: Price: {d[0]:.2f}")
+                        self.log(
+                            f"\t\tBollinger Band reached bottom. Updating target price: {d._name}: Price: {d[0]:.2f}")
+                        # Set current price as buy target (less the required pct increase for pyramid buying)
                         position.update_target_price(current_price)
-                    
-                    # if not position.delay_buy and (current_price <= self.inds[d]["bband"].lines.mid[-1]) and (d.close[-1] >= self.inds[d]["bband"].lines.mid[-1]):
-                    #     position.delay_buy = True
-                    
 
+                    # If buy is allowed, perforom pyramid purchasing based on pyramid parameters
                     if not position.delay_buy:
-                        pct_allocation = position.get_allocation(asset_current_price = current_price)
+                        pct_allocation = position.get_allocation(
+                            asset_current_price=current_price)
                         if pct_allocation > 0 and d._name not in self.open_orders:
                             self.order_target_percent(d, target=pct_allocation)
                         #    position.update_target_price(current_price=current_price)
-                            position.update_target_price(current_price=position.asset_target_price)
-                            self.log(f"\t\tPosition Ordering: {d._name}: Price: {d[0]:.2f}, Weight: {pct_allocation:.2f}")
+                            position.update_target_price(
+                                current_price=position.asset_target_price)
+                            self.log(
+                                f"\t\tPosition Ordering: {d._name}: Price: {d[0]:.2f}, Weight: {pct_allocation:.2f}")
                 except EmptyPositionQueueException:
-                    self.positioning_queue.pop(d, None) # All purchased, remove key
-    
+                    # All purchased, remove key
+                    self.positioning_queue.pop(d, None)
+
     def next(self):
-        # pass
-        
+        """Function responsible for everyday operations:
+            1) Purchase outstanding assets, if any.
+            2) Trailing profit taking and loss cuts, if any.
+        """
+
         self.purchase_assets_in_queue()
 
         posdata = [d for d, pos in self.getpositions().items() if pos]
@@ -253,8 +271,6 @@ class Strategy(bt.Strategy):
                 self.close(d)
                 self.positioning_queue.pop(d, None)
                 continue
-            
-            
 
     def rebalance_portfolio(self, recovery_mode=False):
         # only look at data that we can have indicators for
@@ -276,15 +292,16 @@ class Strategy(bt.Strategy):
 
         else:
             all_valid_etfs = [
-                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1]] #  and self.inds[d]["long_momentum"][0]>0.8]
+                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1]]  # and self.inds[d]["long_momentum"][0]>0.8]
             #]  # self.d_with_len #
 
         top_long_momentums = sorted(
             all_valid_etfs, key=lambda d: self.inds[d]["long_momentum"][0], reverse=True
         )[: self.p.max_stocks+2]
-        
-        momentum_values = [f"{d._name}:{self.inds[d]['long_momentum'][0]:.3f}" for d in top_long_momentums]
-        
+
+        momentum_values = [
+            f"{d._name}:{self.inds[d]['long_momentum'][0]:.3f}" for d in top_long_momentums]
+
         print(f"MOMENTUM VALUES: {', '.join(momentum_values)}")
         # top_long_momentums = [d for d in top_long_momentums if d not in negative_short_momentums][:self.p.max_stocks]
 
@@ -299,11 +316,10 @@ class Strategy(bt.Strategy):
         #   self.trailing_prices.pop(d)
         # self.rebalance_sell_date = self.datas[0].datetime[0]
 
-        
         # Reseet positioning queue
-        self.positioning_queue = {d: self.positioning_queue[d] for d in self.positioning_queue if d in self.buy_positions}
-        
-        
+        self.positioning_queue = {
+            d: self.positioning_queue[d] for d in self.positioning_queue if d in self.buy_positions}
+
         if self.buy_positions:
 
             self.log(f"Available cash: {self.broker.get_cash():.2f}")
@@ -316,25 +332,24 @@ class Strategy(bt.Strategy):
                 )
                 # self.order_target_percent( d, target=target_pct)
                 # See - https://community.backtrader.com/topic/370/unexpected-additional-orders-created-rejected/8
-                
-                if (d not in posdata): # if there is no position, enter new position using pyramid
-                    position_allocation = PyramidPositioning(d, asset_initial_price=d.close[0], asset_total_target_pct=0.95*w, 
-                                                            step_pct_increase=self.p.pyramid_step_pct_increase, n_steps = self.p.pyramid_n_steps)
-                    
-                    if d.close[0] <= self.inds[d]["bband"].lines.mid[-1]: # stock is in downtrend, wait for BB's bottom
-                         position_allocation.delay_buy = True
-                    
+
+                if (d not in posdata):  # if there is no position, enter new position using pyramid
+                    position_allocation = PyramidPositioning(d, asset_initial_price=d.close[0], asset_total_target_pct=0.95*w,
+                                                             step_pct_increase=self.p.pyramid_step_pct_increase, n_steps=self.p.pyramid_n_steps)
+
+                    # stock is in downtrend, delay purchase till BB reaches the bottom
+                    if d.close[0] <= self.inds[d]["bband"].lines.mid[-1]:
+                        position_allocation.delay_buy = True
+
                     self.positioning_queue[d] = position_allocation
                     self.buy_price[d] = d.close[0]
                     self.trailing_price[d] = d.close[0]
 
+                elif d not in self.positioning_queue:  # just rebalance if asset is fully positioned
 
-                elif d not in self.positioning_queue: # just rebalance if asset is fully positioned
-                
                     o = self.order_target_percent(d, target=0.95 * w)
                 #self.buy_price[d] = d.close[0]
                 #self.trailing_price[d] = d.close[0]
-
 
     def notify_timer(self, timer, when, *args, **kwargs):
         if kwargs["name"] == "rebalance":
@@ -382,7 +397,7 @@ class Strategy(bt.Strategy):
         # # Clean up orders
         # self.open_orders = {o.data._name: o for o in self.open_orders.values() if o.alive()}
         # print(f"OPEN ORDERS: {self.open_orders}")
-        
+
         # Write down: no pending order
         self.order = None
 
@@ -391,9 +406,9 @@ if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     universe = INVESCO_STYLE_ETF
     #universe = VANGUARD_STYLE_ETF
-    #universe =BASIC_SECTOR_UNIVERSE
+   # universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
-    universe = EXTENDED_UNIVERSE
+    #universe = EXTENDED_UNIVERSE
    # universe = RANDOM_STOCKS
    # universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = HFEA_UNIVERSE
