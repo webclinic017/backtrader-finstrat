@@ -216,7 +216,6 @@ class Strategy(bt.Strategy):
 
                     # if position.delay_buy and (current_price <= self.inds[d]["bband"].lines.bot[-1] or current_price >= self.inds[d]["bband"].lines.mid[-1]):
                     # If price was in downtrend according to BB and price touched the bottom limit, allow to buy
-                    # If price was in downtend but crossed back to uptrend without reaching bottom, proceed with pyramid...
                     if position.delay_buy and ((current_price <= self.inds[d]["bband"].lines.bot[-1]) or (current_price >= self.inds[d]["bband"].lines.mid[-1])):
                         position.delay_buy = False
                         self.log(
@@ -224,6 +223,11 @@ class Strategy(bt.Strategy):
                         # Set current price as buy target (less the required pct increase for pyramid buying)
                         position.update_target_price(current_price)
 
+                    # if not position.delay_buy and (current_price <= self.inds[d]["bband"].lines.mid[-1]):
+                    #     if not position.passed_middle_wait_till_bottom:
+                    #         position.delay_buy = True
+                    #         position.passed_middle_wait_till_bottom = True
+                    
                     # If buy is allowed, perforom pyramid purchasing based on pyramid parameters
                     if not position.delay_buy:
                         pct_allocation = position.get_allocation(
@@ -405,13 +409,13 @@ class Strategy(bt.Strategy):
 
 if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
-    universe = INVESCO_STYLE_ETF
+    #universe = INVESCO_STYLE_ETF
     #universe = VANGUARD_STYLE_ETF
     #universe =BASIC_SECTOR_UNIVERSE
-   # universe = SECTOR_STYLE_UNIVERSE
-    universe = EXTENDED_UNIVERSE
-    #universe = RANDOM_STOCKS
-    #universe = INVESCO_EQUAL_WEIGHT_ETF
+    universe = SECTOR_STYLE_UNIVERSE
+    #universe = EXTENDED_UNIVERSE
+   # universe = RANDOM_STOCKS
+    universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = HFEA_UNIVERSE
     cerebro = bt.Cerebro()
     cerebro.broker.setcash(100000.0)
