@@ -71,7 +71,7 @@ class Strategy(bt.Strategy):
     params = dict(
         momentum=Momentum,  # parametrize the momentum and its period
         long_momentum_period=90,
-        max_stocks=4,
+        max_stocks=8,
         movav=bt.ind.SMA,  # parametrize the moving average and its periods
         spy_risk_ma=200,
         ticker_uptrend_ma=150,
@@ -329,7 +329,8 @@ class Strategy(bt.Strategy):
 
             self.log(f"Available cash: {self.broker.get_cash():.2f}")
 
-            weights = [1.0 / self.p.max_stocks] * len(self.buy_positions)
+            #weights = [1.0 / self.p.max_stocks] * len(self.buy_positions)
+            weights = self.get_erc_weights(self.buy_positions) # Equal risk contributions (risk parity)
 
             for w, d in zip(weights, self.buy_positions):
                 self.log(
@@ -355,6 +356,22 @@ class Strategy(bt.Strategy):
                     o = self.order_target_percent(d, target=0.95 * w)
                 #self.buy_price[d] = d.close[0]
                 #self.trailing_price[d] = d.close[0]
+                
+    def get_erc_weights(self, buy_positions) -> list:
+        try:
+            rets = np.stack(
+                (
+                    [
+                        self.inds[d]["pct_change1"].get(0, 90).tolist()
+                        for d in buy_positions
+                    ]
+                )
+            ).T
+            erc_weights = erk.weight_erc(pd.DataFrame(rets))
+        except ValueError:
+            self.log("Error with weights, falling back to EW")
+            erc_weights = [1.0 / self.p.max_stocks] * len(buy_positions)
+        return erc_weights
 
     def notify_timer(self, timer, when, *args, **kwargs):
         if kwargs["name"] == "rebalance":
@@ -409,13 +426,13 @@ class Strategy(bt.Strategy):
 
 if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
-    #universe = INVESCO_STYLE_ETF
+   # universe = INVESCO_STYLE_ETF
     #universe = VANGUARD_STYLE_ETF
     #universe =BASIC_SECTOR_UNIVERSE
-    universe = SECTOR_STYLE_UNIVERSE
+    #universe = SECTOR_STYLE_UNIVERSE
     #universe = EXTENDED_UNIVERSE
-   # universe = RANDOM_STOCKS
-    universe = INVESCO_EQUAL_WEIGHT_ETF
+    universe = RANDOM_STOCKS
+    #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = HFEA_UNIVERSE
     cerebro = bt.Cerebro()
     cerebro.broker.setcash(100000.0)

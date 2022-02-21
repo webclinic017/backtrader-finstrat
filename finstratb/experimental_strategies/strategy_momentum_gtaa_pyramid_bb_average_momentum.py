@@ -80,7 +80,6 @@ class Strategy(bt.Strategy):
         # See here - https://www.investopedia.com/ask/answers/122214/what-does-end-quarter-mean-portfolio-management.asp
         #   rebalance_months = [1,2,3,4,5,6,7,8,9,10,11,12],
         rebalance_months=[1, 4, 7, 10],
-        weight_strategy = ['equal_weight', 'equal_risk'][0],
 
         profit_take_pct=0.3,
         stop_loss_pct=-0.25,
@@ -118,9 +117,19 @@ class Strategy(bt.Strategy):
         self.open_orders = {}
 
         for d in self.stocks:
-            self.inds[d]["long_momentum"] = Momentum(
-                d.close, period=self.p.long_momentum_period
+            self.inds[d]["mom_30"] = Momentum(
+                d.close, period=30
             )
+            
+            self.inds[d]["mom_90"] = Momentum(
+                d.close, period=90
+            )
+            
+            self.inds[d]["mom_250"] = Momentum(
+                d.close, period=250
+            )
+            
+            
             self.inds[d]["sma200"] = bt.indicators.EMA(
                 d.close, period=self.p.ticker_uptrend_ma)
             self.inds[d]['bband'] = bt.indicators.BBands(
@@ -306,11 +315,11 @@ class Strategy(bt.Strategy):
             #]  # self.d_with_len #
 
         top_long_momentums = sorted(
-            all_valid_etfs, key=lambda d: self.inds[d]["long_momentum"][0], reverse=True
+            all_valid_etfs, key=lambda d: (1*self.inds[d]["mom_30"][0] + 2*self.inds[d]["mom_90"][0] + 1*self.inds[d]["mom_250"][0])/4.0, reverse=True
         )[: self.p.max_stocks+2]
 
         momentum_values = [
-            f"{d._name}:{self.inds[d]['long_momentum'][0]:.3f}" for d in top_long_momentums]
+            f"{d._name}:{(1*self.inds[d]['mom_30'][0] + 2*self.inds[d]['mom_90'][0] + 1*self.inds[d]['mom_250'][0])/4.0:.3f}" for d in top_long_momentums]
 
         print(f"MOMENTUM VALUES: {', '.join(momentum_values)}")
         # top_long_momentums = [d for d in top_long_momentums if d not in negative_short_momentums][:self.p.max_stocks]
@@ -334,12 +343,7 @@ class Strategy(bt.Strategy):
 
             self.log(f"Available cash: {self.broker.get_cash():.2f}")
 
-            if self.p.weight_strategy == 'equal_weight':
-                weights = [1.0 / self.p.max_stocks] * len(self.buy_positions)
-            elif self.p.weight_strategy == 'equal_risk':
-                weights = self.get_erc_weights(self.buy_positions) # Equal risk contributions (risk parity)
-            else:
-                raise ValueError(f"Invalid weights strategy {self.p.weight_strategy}")
+            weights = [1.0 / self.p.max_stocks] * len(self.buy_positions)
 
             for w, d in zip(weights, self.buy_positions):
                 self.log(
@@ -365,22 +369,6 @@ class Strategy(bt.Strategy):
                     o = self.order_target_percent(d, target=0.95 * w)
                 #self.buy_price[d] = d.close[0]
                 #self.trailing_price[d] = d.close[0]
-                
-    def get_erc_weights(self, buy_positions) -> list:
-        try:
-            rets = np.stack(
-                (
-                    [
-                        self.inds[d]["pct_change1"].get(0, 60).tolist()
-                        for d in buy_positions
-                    ]
-                )
-            ).T
-            erc_weights = erk.weight_erc(pd.DataFrame(rets))
-        except ValueError:
-            self.log("Error with weights, falling back to EW")
-            erc_weights = [1.0 / self.p.max_stocks] * len(buy_positions)
-        return erc_weights
 
     def notify_timer(self, timer, when, *args, **kwargs):
         if kwargs["name"] == "rebalance":
@@ -435,9 +423,9 @@ class Strategy(bt.Strategy):
 
 if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
-    universe = INVESCO_STYLE_ETF
+    #universe = INVESCO_STYLE_ETF
     #universe = VANGUARD_STYLE_ETF
-    #universe =BASIC_SECTOR_UNIVERSE
+    universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
     #universe = EXTENDED_UNIVERSE
     ##universe = RANDOM_STOCKS

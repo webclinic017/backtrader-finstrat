@@ -64,6 +64,23 @@ BASIC_SECTOR_UNIVERSE = [
  #   'UPRO'
 ]
 
+PBEAR = [
+   'PDBC',
+   'VIOV',
+   'VIOG',
+   'VUG',
+   'VTV',
+   'VNQ',
+   'VEA',
+   'VWO',
+   'VCLT',
+   'GLD',
+   'TLT'
+
+    
+]
+
+
 
 HFEA_UNIVERSE = [
     'UPRO',
