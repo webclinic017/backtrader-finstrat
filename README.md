@@ -2,9 +2,9 @@
 
 
 
-## Momentum based, with tactical asset allocation, pyramid positioning (Bollinger Bands)
+## Active Stratefy - momentum based, with tactical asset allocation, pyramid positioning (Bollinger Bands)
 
-Source code - `strategy_momentum_gtaa_pyramid_bollinger_bands.py`
+Source code - `strategy_momentum_gtaa_py_bb_atr_stoploss.py`
 
 ### Risk Management
 
@@ -15,7 +15,12 @@ Source code - `strategy_momentum_gtaa_pyramid_bollinger_bands.py`
 Reasoning - don't catch a falling knife, however, monthly intervals allow room for the market to recover if briefly touching SMA200.
 
 2) Daily checks
-    * If individual asset's trailing decline > 25%, close position.
+    * Checks trailing high against deviation of scaled average true range ATR(90) of the stock.
+        * ATR is more robust than using constant trailing % loss, since it takes into account historical volatility of specific stock.
+        * The larger is number of days from trailing high, the more likely price to break the ATR
+            * To count that, ATR is scaled by number of days (up-to 6) from the high
+        * ATR approach is more sound theoretically and is robust under different universes, as opposed to constant 20%, which was more tuned to the extended universe
+        * It is mechanism that backs up the global (monthly) risk management in a robust manner.
 
 3) Quarterly - if the global market is in a downtrend, don't rebalance and continue holding safe assets.
 
@@ -33,7 +38,7 @@ Profit-taking is happening in 2 cases:
 
 
 
-## Momentum based, with tactical asset allocation, pyramid positioning
+## Past strategy - momentum based, with tactical asset allocation, pyramid positioning
 
 Source code - `strategy_momentum_gtaa_pyramiding.py`
 

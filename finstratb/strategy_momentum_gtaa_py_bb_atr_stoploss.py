@@ -83,13 +83,15 @@ class Strategy(bt.Strategy):
         weight_strategy = ['equal_weight', 'equal_risk'][1],
 
         profit_take_pct=0.3,
-        stop_loss_pct=-0.25,
+       # stop_loss_pct=-0.25,
 
         # minimum price increase percentage for pyramid buy
         pyramid_step_pct_increase=0.0025,
         pyramid_n_steps=2,  # number of pyramid steps
         bbands_period=20,  # bollinger bands look back period, used for purchase decision in the
-        bbands_devfactor=2  # historical std deviation factor for BB calculation
+        bbands_devfactor=2,  # historical std deviation factor for BB calculation
+        atr_factor_trailing_stop = 1,
+        atr_max_days_from_high = 6
 
     )
 
@@ -116,6 +118,7 @@ class Strategy(bt.Strategy):
         self.is_downtrend = False
         self.positioning_queue = {}
         self.open_orders = {}
+        self.atr_days_since_high = {}
 
         for d in self.stocks:
             self.inds[d]["long_momentum"] = Momentum(
@@ -125,6 +128,8 @@ class Strategy(bt.Strategy):
                 d.close, period=self.p.ticker_uptrend_ma)
             self.inds[d]['bband'] = bt.indicators.BBands(
                 d.close, period=self.p.bbands_period, devfactor=self.p.bbands_devfactor)
+            
+            self.inds[d]['atr'] = bt.indicators.ATR(d, period = 90)
             self.inds[d]["pct_change1"] = bt.indicators.PercentChange(
                 d.close, period=1)
 
@@ -259,11 +264,16 @@ class Strategy(bt.Strategy):
         posdata = [d for d, pos in self.getpositions().items() if pos]
 
         for d in posdata:
+            self.atr_days_since_high.setdefault(d, 1)
 
             if (
                 d.close[-1] >= self.trailing_price[d]
             ):  # this is required for max drawdown calculation for trailing stop loss
                 self.trailing_price[d] = d.close[-1]
+                self.atr_days_since_high[d] = 1
+            else:
+                self.atr_days_since_high[d]+=1
+                self.atr_days_since_high[d] = min(self.p.atr_max_days_from_high, self.atr_days_since_high[d]) # limit by n days
 
             if d in self.buy_price and (
                 d.close[-1] / self.buy_price[d] - 1.0 > self.p.profit_take_pct
@@ -274,10 +284,11 @@ class Strategy(bt.Strategy):
                 self.close(d)
                 self.positioning_queue.pop(d, None)
                 continue
-
-            if d in self.trailing_price and (d.close[-1] / self.trailing_price[d] - 1.0 < self.p.stop_loss_pct):
+            #print(f"ATR: {self.inds[d]['atr'][-1]}")
+            if d in self.trailing_price and (d.close[-1] <  self.trailing_price[d] - self.p.atr_factor_trailing_stop*self.inds[d]['atr'][-1]*self.atr_days_since_high[d]) and (d not in self.positioning_queue):
+            #if (d.close[-1] <  d.close[-2] - self.p.atr_factor_trailing_stop * self.inds[d]['atr'][-2]):
                 self.log(
-                    f"RISK MANAGEMENT: TRAILING STOP LOSS for {d._name}, price: {d[-1]:.2f}")
+                    f"RISK MANAGEMENT: ATR TRAILING STOP LOSS for {d._name}, price: {d[-1]:.2f}, ATR days high: {self.atr_days_since_high[d]}, trailing high: {self.trailing_price[d]:.2f}, ATR: {self.p.atr_factor_trailing_stop * self.inds[d]['atr'][-1]:.2f}")
                 self.close(d)
                 self.positioning_queue.pop(d, None)
                 continue
@@ -433,17 +444,18 @@ class Strategy(bt.Strategy):
         self.order = None
 
 
+
 if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
- #   universe = INVESCO_STYLE_ETF
-    #universe = VANGUARD_STYLE_ETF
-  #  universe =BASIC_SECTOR_UNIVERSE
+    # universe = INVESCO_STYLE_ETF
+#    universe = VANGUARD_STYLE_ETF
+   # universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
-    #universe = EXTENDED_UNIVERSE
-   #universe = RANDOM_STOCKS
+    universe = EXTENDED_UNIVERSE
+    #universe = RANDOM_STOCKS
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = HFEA_UNIVERSE
-   # universe = PBEAR
+  #  universe = PBEAR
     cerebro = bt.Cerebro()
     cerebro.broker.setcash(100000.0)
 
@@ -457,7 +469,7 @@ if __name__ == "__main__":
     cerebro.broker.set_checksubmit(checksubmit=False)
 
     data_dict = get_data(symbols=["SPY"] + universe)
-    #from_date = datetime.datetime(1999, 12, 15)
+    # from_date = datetime.datetime(1999, 12, 15)
     from_date = datetime.datetime(2005, 12, 15)
    # to_date = datetime.datetime(2020,2,17)
     to_date = datetime.datetime.now()
@@ -522,5 +534,5 @@ if __name__ == "__main__":
     returns.index = returns.index.tz_convert(None)
 
     quantstats.reports.html(returns, benchmark="SPY",
-                            output="results/rotation_stats_gtaa_pyramid_bb_positioning.html")
+                            output="results/rotation_stats_gtaa_pyramid_bb_positioning_atr.html")
     cerebro.plot(iplot=False)[0][0]
