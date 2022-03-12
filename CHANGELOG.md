@@ -1,0 +1,1 @@
+2022-03-11 Increased profit taking to 35%. There is a small chance when profit taking is happenning at the same time as risk management selling

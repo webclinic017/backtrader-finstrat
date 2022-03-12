@@ -82,7 +82,7 @@ class Strategy(bt.Strategy):
         rebalance_months=[1, 4, 7, 10],
         weight_strategy = ['equal_weight', 'equal_risk'][1],
 
-        profit_take_pct=0.3,
+        profit_take_pct=0.35,
        # stop_loss_pct=-0.25,
 
         # minimum price increase percentage for pyramid buy
@@ -275,7 +275,7 @@ class Strategy(bt.Strategy):
                 self.atr_days_since_high[d]+=1
                 self.atr_days_since_high[d] = min(self.p.atr_max_days_from_high, self.atr_days_since_high[d]) # limit by n days
 
-            if d in self.buy_price and (
+            if d in self.buy_price and (d not in self.open_orders) and (
                 d.close[-1] / self.buy_price[d] - 1.0 > self.p.profit_take_pct
             ):
                 self.log(
@@ -285,7 +285,7 @@ class Strategy(bt.Strategy):
                 self.positioning_queue.pop(d, None)
                 continue
             #print(f"ATR: {self.inds[d]['atr'][-1]}")
-            if d in self.trailing_price and (d.close[-1] <  self.trailing_price[d] - self.p.atr_factor_trailing_stop*self.inds[d]['atr'][-1]*self.atr_days_since_high[d]) and (d not in self.positioning_queue):
+            if d in self.trailing_price and (d not in self.open_orders) and (d.close[-1] <  self.trailing_price[d] - self.p.atr_factor_trailing_stop*self.inds[d]['atr'][-1]*self.atr_days_since_high[d]) and (d not in self.positioning_queue):
             #if (d.close[-1] <  d.close[-2] - self.p.atr_factor_trailing_stop * self.inds[d]['atr'][-2]):
                 self.log(
                     f"RISK MANAGEMENT: ATR TRAILING STOP LOSS for {d._name}, price: {d[-1]:.2f}, ATR days high: {self.atr_days_since_high[d]}, trailing high: {self.trailing_price[d]:.2f}, ATR: {self.p.atr_factor_trailing_stop * self.inds[d]['atr'][-1]:.2f}")
