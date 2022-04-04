@@ -34,7 +34,7 @@ from finstratb.misc.helpers import (
     get_yahooquery_data_from_file,
     get_single_ticker_data_from_file,
 )
-from finstratb.misc.momentum import Momentum
+from finstratb.misc.mom_idiosync import IdiosyncMomentum
 from finstratb.misc.positioning import PyramidPositioning, EmptyPositionQueueException
 import collections
 import quantstats
@@ -70,7 +70,8 @@ class BuyAndHold_1(bt.Strategy):
 
 class Strategy(bt.Strategy):
     params = dict(
-        momentum=Momentum,  # parametrize the momentum and its period
+        momentum_instance = None, 
+      #   momentum=IdiosyncMomentum,  # parametrize the momentum and its period
         long_momentum_period=90,
         max_stocks=4,
         movav=bt.ind.SMA,  # parametrize the moving average and its periods
@@ -78,9 +79,9 @@ class Strategy(bt.Strategy):
         ticker_uptrend_ma=150,
         ticker_short_ma=50,
         # See here - https://www.investopedia.com/ask/answers/122214/what-does-end-quarter-mean-portfolio-management.asp
-        #   rebalance_months = [1,2,3,4,5,6,7,8,9,10,11,12],
+        #rebalance_months = [2,3,4,5,6,7,8,9,10,11,12],
         
-       # rebalance_months=[3,6,9,12],
+        #rebalance_months=[3,6,9,12],
         rebalance_months=[1, 4, 7, 10],
         weight_strategy = ['equal_weight', 'equal_risk'][1],
 
@@ -123,9 +124,9 @@ class Strategy(bt.Strategy):
         self.atr_days_since_high = {}
 
         for d in self.stocks:
-            self.inds[d]["long_momentum"] = Momentum(
-                d.close, period=self.p.long_momentum_period
-            )
+            # self.inds[d]["long_momentum"] = self.p.momentum(
+            #     d, period=self.p.long_momentum_period
+            # )
             self.inds[d]["sma200"] = bt.indicators.EMA(
                 d.close, period=self.p.ticker_uptrend_ma)
             self.inds[d]['bband'] = bt.indicators.BBands(
@@ -318,12 +319,19 @@ class Strategy(bt.Strategy):
                 d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1]]  # and self.inds[d]["long_momentum"][0]>0.8]
             #]  # self.d_with_len #
 
+        current_date = bt.num2date(self.data.datetime[0])
+        # print(current_date)
+        # 1/0
         top_long_momentums = sorted(
-            all_valid_etfs, key=lambda d: self.inds[d]["long_momentum"][0], reverse=True
+            all_valid_etfs, key=lambda d: self.p.momentum_instance.get_momentum(d._name, current_date), reverse=True
         )[: self.p.max_stocks+2]
+        
+        # top_long_momentums = sorted(
+        #     all_valid_etfs, key=lambda d: self.inds[d]["long_momentum"][0], reverse=True
+        # )[: self.p.max_stocks+2]
 
         momentum_values = [
-            f"{d._name}:{self.inds[d]['long_momentum'][0]:.3f}" for d in top_long_momentums]
+            f"{d._name}:{self.p.momentum_instance.get_momentum(d._name, current_date):.3f}" for d in top_long_momentums]
 
         print(f"MOMENTUM VALUES: {', '.join(momentum_values)}")
         # top_long_momentums = [d for d in top_long_momentums if d not in negative_short_momentums][:self.p.max_stocks]
@@ -454,10 +462,10 @@ if __name__ == "__main__":
     #universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
     universe = EXTENDED_UNIVERSE
-   # universe = RANDOM_STOCKS
+    #universe = RANDOM_STOCKS
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = HFEA_UNIVERSE
-    #universe = PBEAR
+  #  universe = PBEAR
     cerebro = bt.Cerebro()
     cerebro.broker.setcash(100000.0)
 
@@ -491,6 +499,8 @@ if __name__ == "__main__":
     #         plot=False,
     #     )
     # )
+    
+    imom = IdiosyncMomentum(ticker_data = data_dict)
 
     for symbol, data in data_dict.items():
         # print(data)
@@ -517,7 +527,7 @@ if __name__ == "__main__":
 
     print("Starting Portfolio Value: %.2f" % cerebro.broker.getvalue())
 
-    cerebro.addstrategy(Strategy)
+    cerebro.addstrategy(Strategy, momentum_instance = imom)
    # cerebro.addstrategy(BuyAndHold_1)
     results = cerebro.run()
 
@@ -536,5 +546,5 @@ if __name__ == "__main__":
     returns.index = returns.index.tz_convert(None)
 
     quantstats.reports.html(returns, benchmark="SPY",
-                            output="results/rotation_stats_gtaa_pyramid_bb_positioning_atr.html")
+                            output="results/idiosync_rotation_stats_gtaa_pyramid_bb_positioning_atr.html")
     cerebro.plot(iplot=False)[0][0]
