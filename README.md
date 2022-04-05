@@ -2,11 +2,14 @@
 
 
 
-## Active Stratefy - momentum based, with tactical asset allocation, pyramid positioning (Bollinger Bands)
+## Active Stratefy - Residual (idiosyncratic) momentum based, with tactical asset allocation, pyramid positioning (Bollinger Bands)
 
-Source code - `strategy_momentum_gtaa_py_bb_atr_stoploss.py`
+Source code - `strategy_idiosync_m_gtaa_py_bb_atr_stoploss.py`
 
 ### Risk Management
+0) Quarterly (rebalance) checks
+    * If the global market is in a downtrend, don't rebalance and continue holding safe assets.
+    * Individual stocks - exclude from consideration stocks in downtrend (SMA < 200 or 150)
 
 1) Monthly checks (beginning of each month)
     * if the global market is in a downtrend (< 200SMA), exist equities and buy safe assets.
@@ -22,7 +25,6 @@ Reasoning - don't catch a falling knife, however, monthly intervals allow room f
         * ATR approach is more sound theoretically and is robust under different universes, as opposed to constant 20%, which was more tuned to the extended universe
         * It is mechanism that backs up the global (monthly) risk management in a robust manner.
 
-3) Quarterly - if the global market is in a downtrend, don't rebalance and continue holding safe assets.
 
 ### Positioning
 
@@ -37,8 +39,13 @@ Profit-taking is happening in 2 cases:
 2) Profit-taking if an asset appreciated 30% compared to its buy price (for any continuous period, not just a quarter)
 
 
+## Past strategy - Absolute momentum based, with tactical asset allocation, pyramid positioning (Bollinger Bands)
+Source code - `strategy_momentum_gtaa_py_bb_atr_stoploss.py`
 
-## Past strategy - momentum based, with tactical asset allocation, pyramid positioning
+* Shares the same features as the main strategy, just the momentum calculation is different.
+
+
+## Past strategy 2 - momentum based, with tactical asset allocation, pyramid positioning
 
 Source code - `strategy_momentum_gtaa_pyramiding.py`
 
