@@ -1,7 +1,4 @@
-""" This strategy uses the momentum logic from GTAA main, however uses pyramiding technique for positions using moving average rather than fixed percentage
-Based on ideas from - https://bastion.substack.com/p/improving-the-stop-loss
-
-This strategy uses Bollinger bands to decide when to enter the trade
+""" This strategy uses a different momentum definition - idiosyncratic momentum
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -73,7 +70,7 @@ class Strategy(bt.Strategy):
         momentum_instance = None, 
       #   momentum=IdiosyncMomentum,  # parametrize the momentum and its period
         long_momentum_period=90,
-        max_stocks=4,
+        max_stocks=5,
         movav=bt.ind.SMA,  # parametrize the moving average and its periods
         spy_risk_ma=200,
         ticker_uptrend_ma=150,
@@ -308,23 +305,25 @@ class Strategy(bt.Strategy):
             return
 
         self.is_downtrend = False
+        
+        current_date = bt.num2date(self.data.datetime[0])
 
+        
+        # In recovery mode, exclude safe assets
         if recovery_mode:
             all_valid_etfs = [
                 d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1] and d not in self.safe_assets
             ]
 
         else:
+            # get rid of candidates who are clearly in downtrend, regardless of momentum
             all_valid_etfs = [
-                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1]]  # and self.inds[d]["long_momentum"][0]>0.8]
-            #]  # self.d_with_len #
+                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1]]  
+            
 
-        current_date = bt.num2date(self.data.datetime[0])
-        # print(current_date)
-        # 1/0
         top_long_momentums = sorted(
             all_valid_etfs, key=lambda d: self.p.momentum_instance.get_momentum(d._name, current_date), reverse=True
-        )[: self.p.max_stocks+2]
+        )[: self.p.max_stocks+2] # +2 is only for display purposes
         
         # top_long_momentums = sorted(
         #     all_valid_etfs, key=lambda d: self.inds[d]["long_momentum"][0], reverse=True
@@ -342,10 +341,6 @@ class Strategy(bt.Strategy):
         for d in sell_positions:
             self.log(f"Exiting position: {d._name}: {d[0]:.2f}")
             self.order_target_percent(d, target=0.0)
-            # self.buy_price.pop(d, None)
-        #    self.positioning_queue.pop(d, None)
-        #   self.trailing_prices.pop(d)
-        # self.rebalance_sell_date = self.datas[0].datetime[0]
 
         # Reseet positioning queue
         self.positioning_queue = {
@@ -465,7 +460,7 @@ if __name__ == "__main__":
     #universe = RANDOM_STOCKS
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = HFEA_UNIVERSE
-  #  universe = PBEAR
+    #universe = PBEAR
     cerebro = bt.Cerebro()
     cerebro.broker.setcash(100000.0)
 

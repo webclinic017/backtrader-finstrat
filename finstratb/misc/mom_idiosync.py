@@ -1,3 +1,8 @@
+""" Based on the  Blitz, David, Matthias X. Hanauer, and Milan Vidojevic. 
+“The Idiosyncratic Momentum Anomaly.” SSRN Scholarly Paper. Rochester, NY: Social Science Research Network, April 7, 2020. https://doi.org/10.2139/ssrn.2947044.
+https://papers.ssrn.com/abstract=2947044
+"""
+
 import datetime as dt
 from typing import Union
 
@@ -9,7 +14,7 @@ from loguru import logger
 from numpy_ext import rolling_apply
 
 
-def rolling_residuals(y: pd.Series, mkt_rf: pd.Series, smb: pd.Series, hml: pd.Series) -> float:
+def rolling_residuals(dates: pd.Series, y: pd.Series, mkt_rf: pd.Series, smb: pd.Series, hml: pd.Series) -> float:
     """Calculates residals from fitting a linear regression model.
         The residuals are calculated for a given stock for the rolling window.
 
@@ -25,7 +30,7 @@ def rolling_residuals(y: pd.Series, mkt_rf: pd.Series, smb: pd.Series, hml: pd.S
     Returns:
         float: the residual (eps) for the last month
     """
-
+    # logger.debug(f"Rolling dates: {dates}")
     x = np.stack([mkt_rf, smb, hml]).T
     x = sm.add_constant(x)
     model = sm.OLS(y, x).fit()
@@ -57,9 +62,9 @@ class IdiosyncMomentum:
         self._cache = {}
 
     def get_ff_factors(self) -> pd.DataFrame:
-        """Retrieves updated Farma-French factors"""
+        """Retrieves the latest Fama-French factors"""
 
-        logger.info("Fetching Farma-French factors...")
+        logger.info("Fetching Fama-French 3-factor data...")
         factors = gff.famaFrench3Factor(frequency="m")
         return factors.set_index("date_ff_factors").resample("D").pad()
 
@@ -82,17 +87,19 @@ class IdiosyncMomentum:
         )
 
         monthly_combined = monthly_combined.assign(
-            residuals=rolling_apply(
+            residuals=rolling_apply( # Calculates rolling regression based on 36 month window
                 rolling_residuals,
                 self.rolling_window_coeff,
+                monthly_combined.index.values,
                 monthly_combined["monthly_returns_less_rf"].values,
                 monthly_combined["Mkt-RF"].values,
                 monthly_combined["SMB"].values,
                 monthly_combined["HML"].values,
+                n_jobs = 1 # Can increase parallelism
             )
-        ).assign(
+        ).assign( 
             idiosync_momentum=lambda df: df["residuals"]
-            .rolling(
+            .rolling( # Calculates rolling residual momentum
                 15
             )  # Real calculation will be done on the window of less than 15 days, so this is just an upper limit.
             .apply(idiosync_momentum, kwargs={"n_month": self.rolling_window_mom})
@@ -100,8 +107,22 @@ class IdiosyncMomentum:
         return monthly_combined
 
     def get_momentum(self, ticker: str, date: Union[str, dt.datetime]) -> float:
+        """Calculates residual (idiosyncratic) momentum for a giver ticker and date.
+
+        Args:
+            ticker (str): ticker name, should be in the data
+            date (Union[str, dt.datetime]): Latest date for the momentum value, will return closest value not beyond the date
+
+        Raises:
+            KeyError: if requestes ticker doesn't exist in the input data.
+
+        Returns:
+            float: value of the residual momentum
+        """
+        
         if ticker not in self.all_tickers:
             raise KeyError(f"Data for {ticker} doesn't exist")
+        
         if ticker not in self._cache:
             logger.info(f"Caching data for {ticker}...")
             self._cache[ticker] = self._estimate_momentum(ticker)
