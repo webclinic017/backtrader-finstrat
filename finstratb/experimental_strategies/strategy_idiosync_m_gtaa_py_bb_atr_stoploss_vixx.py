@@ -1,4 +1,5 @@
 """ This strategy uses a different momentum definition - idiosyncratic momentum
+This one uses VIX hedging
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -70,7 +71,7 @@ class Strategy(bt.Strategy):
         momentum_instance = None, 
       #   momentum=IdiosyncMomentum,  # parametrize the momentum and its period
         long_momentum_period=90,
-        max_stocks=4,
+        max_stocks=5,
         movav=bt.ind.SMA,  # parametrize the moving average and its periods
         spy_risk_ma=200,
         ticker_uptrend_ma=150,
@@ -86,8 +87,8 @@ class Strategy(bt.Strategy):
        # stop_loss_pct=-0.25,
 
         # minimum price increase percentage for pyramid buy
-        pyramid_step_pct_increase=0.001, # 0.0025,
-        pyramid_n_steps=3,  # number of pyramid steps
+        pyramid_step_pct_increase=0.0025,
+        pyramid_n_steps=2,  # number of pyramid steps
         bbands_period=20,  # bollinger bands look back period, used for purchase decision in the
         bbands_devfactor=2,  # historical std deviation factor for BB calculation
         atr_factor_trailing_stop = 1,
@@ -107,7 +108,7 @@ class Strategy(bt.Strategy):
        # self.spy_sma50 = self.p.movav(self.spy.close, period=50)
         self.safe_assets = [d for d in self.stocks if d._name in [
             "TLT", 'GLD']]  # + [self.spy]
-        self.safe_asset_weights = {"GLD": 0.4, "TLT": 0.4}  # , 'SPY':0.05}
+        self.safe_asset_weights = {"GLD": 0.1, "TLT": 0.4}  # , 'SPY':0.05}
         self.hedge = False
         self.d_with_len = self.stocks
         self.buy_positions = []
@@ -145,7 +146,7 @@ class Strategy(bt.Strategy):
             name="risk",
             when=bt.timer.SESSION_START,
             monthdays=[
-               5
+                6
             ],  # Day 6 is arbitrary, we need to be sure to be check for risks after the rebalance
             monthcarry=True,
             cheat=False,
@@ -167,12 +168,12 @@ class Strategy(bt.Strategy):
         self.next()
 
     def global_market_risk_hedge(self):
+        return
         
         """Global risk hedge works on a monthly cadence:
             If SPY's price < SMA200, market is in confirmed downtrend, switch to ALL to safe assets. Set downtrend to True
             If SPY's price >= SMA200 and market was previously in downtrend, rebalance straight away, even before the official rebalance cadence.
         """
-
 
         if self.spy.close[-1] >= self.spy_sma200[-1] or self.skip_hedge:
             if self.is_downtrend:
@@ -229,7 +230,7 @@ class Strategy(bt.Strategy):
                     if position.delay_buy and ((current_price <= self.inds[d]["bband"].lines.bot[-1]) or (current_price >= self.inds[d]["bband"].lines.mid[-1])):
                         position.delay_buy = False
                         self.log(
-                            f"\t\tBollinger Band reached bottom. Updating target price: {d._name}: Price: {d[0]:.2f}")
+                            f"\t\tBollinger Band reached bottom (or crossed back the mid). Updating target price: {d._name}: Price: {d[0]:.2f}")
                         # Set current price as buy target (less the required pct increase for pyramid buying)
                         position.update_target_price(current_price)
 
@@ -265,10 +266,12 @@ class Strategy(bt.Strategy):
         posdata = [d for d, pos in self.getpositions().items() if pos]
 
         for d in posdata:
+            if d._name == "^VIX":
+                continue
+            
             self.atr_days_since_high.setdefault(d, 1)
 
-            if (
-                d.close[-1] >= self.trailing_price[d]
+            if (d in self.trailing_price and d.close[-1] >= self.trailing_price[d]
             ):  # this is required for max drawdown calculation for trailing stop loss
                 self.trailing_price[d] = d.close[-1]
                 self.atr_days_since_high[d] = 1
@@ -313,13 +316,13 @@ class Strategy(bt.Strategy):
         # In recovery mode, exclude safe assets
         if recovery_mode:
             all_valid_etfs = [
-                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1] and d not in self.safe_assets
+                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1] and d not in self.safe_assets and d._name!='^VIX'
             ]
 
         else:
             # get rid of candidates who are clearly in downtrend, regardless of momentum
             all_valid_etfs = [
-                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1]]
+                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1]  and d._name!='^VIX']  
             
 
         top_long_momentums = sorted(
@@ -366,7 +369,7 @@ class Strategy(bt.Strategy):
                 # See - https://community.backtrader.com/topic/370/unexpected-additional-orders-created-rejected/8
 
                 if (d not in posdata):  # if there is no position, enter new position using pyramid
-                    position_allocation = PyramidPositioning(d, asset_initial_price=d.close[0], asset_total_target_pct=0.95*w,
+                    position_allocation = PyramidPositioning(d, asset_initial_price=d.close[0], asset_total_target_pct=0.95*0.9*w,
                                                              step_pct_increase=self.p.pyramid_step_pct_increase, n_steps=self.p.pyramid_n_steps)
 
                     # stock is in downtrend, delay purchase till BB reaches the bottom
@@ -379,7 +382,14 @@ class Strategy(bt.Strategy):
 
                 elif d not in self.positioning_queue:  # just rebalance if asset is fully positioned
 
-                    o = self.order_target_percent(d, target=0.95 * w)
+                    o = self.order_target_percent(d, target=0.95 * 0.9*w)
+            
+            d_vix = [d for d in self.d_with_len if d._name == "^VIX"][0]
+            self.log(
+                    f"Ordering VIX...{d_vix._name, d_vix}"
+                )
+            
+            self.order_target_percent(d_vix, target=0.1)
                 #self.buy_price[d] = d.close[0]
                 #self.trailing_price[d] = d.close[0]
                 
@@ -454,7 +464,7 @@ class Strategy(bt.Strategy):
 if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = INVESCO_STYLE_ETF
-   # universe = VANGUARD_STYLE_ETF
+    #universe = VANGUARD_STYLE_ETF
     #universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
     universe = EXTENDED_UNIVERSE
@@ -474,7 +484,7 @@ if __name__ == "__main__":
 
     cerebro.broker.set_checksubmit(checksubmit=False)
 
-    data_dict = get_data(symbols=["SPY"] + universe)
+    data_dict = get_data(symbols=["SPY", "^VIX"] + universe)
     # from_date = datetime.datetime(1999, 12, 15)
     from_date = datetime.datetime(2005, 12, 15)
    # to_date = datetime.datetime(2020,2,17)
@@ -542,5 +552,5 @@ if __name__ == "__main__":
     returns.index = returns.index.tz_convert(None)
 
     quantstats.reports.html(returns, benchmark="SPY",
-                            output="results/idiosync_rotation_stats_gtaa_pyramid_bb_positioning_atr.html")
+                            output="results/idiosync_rotation_stats_gtaa_pyramid_bb_positioning_atr_vix.html")
     cerebro.plot(iplot=False)[0][0]

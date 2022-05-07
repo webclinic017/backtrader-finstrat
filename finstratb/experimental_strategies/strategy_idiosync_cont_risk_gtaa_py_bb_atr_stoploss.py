@@ -86,7 +86,7 @@ class Strategy(bt.Strategy):
        # stop_loss_pct=-0.25,
 
         # minimum price increase percentage for pyramid buy
-        pyramid_step_pct_increase=0.001, # 0.0025,
+        pyramid_step_pct_increase=0.001,
         pyramid_n_steps=3,  # number of pyramid steps
         bbands_period=20,  # bollinger bands look back period, used for purchase decision in the
         bbands_devfactor=2,  # historical std deviation factor for BB calculation
@@ -107,7 +107,7 @@ class Strategy(bt.Strategy):
        # self.spy_sma50 = self.p.movav(self.spy.close, period=50)
         self.safe_assets = [d for d in self.stocks if d._name in [
             "TLT", 'GLD']]  # + [self.spy]
-        self.safe_asset_weights = {"GLD": 0.4, "TLT": 0.4}  # , 'SPY':0.05}
+        self.safe_asset_weights = {"GLD": 0.1, "TLT": 0.4}  # , 'SPY':0.05}
         self.hedge = False
         self.d_with_len = self.stocks
         self.buy_positions = []
@@ -119,6 +119,7 @@ class Strategy(bt.Strategy):
         self.positioning_queue = {}
         self.open_orders = {}
         self.atr_days_since_high = {}
+        self.monitor_risk = True
 
         for d in self.stocks:
             # self.inds[d]["long_momentum"] = self.p.momentum(
@@ -145,11 +146,22 @@ class Strategy(bt.Strategy):
             name="risk",
             when=bt.timer.SESSION_START,
             monthdays=[
-               5
+               1,2,3,4,5
             ],  # Day 6 is arbitrary, we need to be sure to be check for risks after the rebalance
             monthcarry=True,
             cheat=False,
         )
+        
+        self.add_timer(
+            name="monitor_risk_on",
+            when=bt.timer.SESSION_START,
+            monthdays=[
+                6
+            ],  # Day 6 is arbitrary, we need to be sure to be check for risks after the rebalance
+            monthcarry=True,
+            cheat=False,
+        )
+
 
     def nextstart(self):
         # This is called exactly ONCE, when next is 1st called and defaults to
@@ -172,18 +184,22 @@ class Strategy(bt.Strategy):
             If SPY's price < SMA200, market is in confirmed downtrend, switch to ALL to safe assets. Set downtrend to True
             If SPY's price >= SMA200 and market was previously in downtrend, rebalance straight away, even before the official rebalance cadence.
         """
-
+        
+        if not self.monitor_risk:
+            return
+        
 
         if self.spy.close[-1] >= self.spy_sma200[-1] or self.skip_hedge:
             if self.is_downtrend:
                 self.log("REBALANCING DUE TO DETECTED MARKET RECOVERY")
                 self.rebalance_portfolio(recovery_mode=True)
+                self.monitor_risk = False
             self.is_downtrend = False
-            self.skip_hedge = False
             return
 
         # This code is executed if SPY < SMA(SPY)
         self.is_downtrend = True
+        self.monitor_risk = False # Turn off the monitor since it is downtrend
 
         posdata = [d for d, pos in self.getpositions().items() if pos]
       #  safe_assets = [d for d in self.safe_assets if d not in posdata]
@@ -319,7 +335,7 @@ class Strategy(bt.Strategy):
         else:
             # get rid of candidates who are clearly in downtrend, regardless of momentum
             all_valid_etfs = [
-                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1]]
+                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1]]  
             
 
         top_long_momentums = sorted(
@@ -404,8 +420,15 @@ class Strategy(bt.Strategy):
             if when.month in self.p.rebalance_months:
                 self.log(f"====== REBALANCING ======")
                 self.rebalance_portfolio()
+        
         elif kwargs["name"] == "risk":
             self.global_market_risk_hedge()
+            
+        elif kwargs["name"] == "monitor_risk_on":
+            self.log(f"====== SETTING RISK MONITOR TO ON ======")
+            self.monitor_risk = True
+            self.skip_hedge = False
+            # self.global_market_risk_hedge()
 
     def log(self, txt, dt=None):
         """Logging function fot this strategy"""
@@ -454,7 +477,7 @@ class Strategy(bt.Strategy):
 if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = INVESCO_STYLE_ETF
-   # universe = VANGUARD_STYLE_ETF
+    #universe = VANGUARD_STYLE_ETF
     #universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
     universe = EXTENDED_UNIVERSE
@@ -542,5 +565,5 @@ if __name__ == "__main__":
     returns.index = returns.index.tz_convert(None)
 
     quantstats.reports.html(returns, benchmark="SPY",
-                            output="results/idiosync_rotation_stats_gtaa_pyramid_bb_positioning_atr.html")
+                            output="results/idiosync_rotation_stats_gtaa_pyramid_bb_positioning_atr_cont_risk.html")
     cerebro.plot(iplot=False)[0][0]
