@@ -107,7 +107,7 @@ class Strategy(bt.Strategy):
        # self.spy_sma50 = self.p.movav(self.spy.close, period=50)
         self.safe_assets = [d for d in self.stocks if d._name in [
             "TLT", 'GLD']]  # + [self.spy]
-        self.safe_asset_weights = {"GLD": 0.3, "TLT": 0.3}  # , 'SPY':0.05}
+        self.safe_asset_weights = {"GLD": 0.35, "TLT": 0.35}  # , 'SPY':0.05}
         self.hedge = False
         self.d_with_len = self.stocks
         self.buy_positions = []
@@ -264,6 +264,8 @@ class Strategy(bt.Strategy):
 
         posdata = [d for d, pos in self.getpositions().items() if pos]
 
+        # if self.downtrend:
+        #     return
         for d in posdata:
             self.atr_days_since_high.setdefault(d, 1)
 
