@@ -107,7 +107,7 @@ class Strategy(bt.Strategy):
        # self.spy_sma50 = self.p.movav(self.spy.close, period=50)
         self.safe_assets = [d for d in self.stocks if d._name in [
             "TLT", 'GLD']]  # + [self.spy]
-        self.safe_asset_weights = {"GLD": 0.4, "TLT": 0.4}  # , 'SPY':0.05}
+        self.safe_asset_weights = {"GLD": 0.3, "TLT": 0.3}  # , 'SPY':0.05}
         self.hedge = False
         self.d_with_len = self.stocks
         self.buy_positions = []
@@ -145,7 +145,7 @@ class Strategy(bt.Strategy):
             name="risk",
             when=bt.timer.SESSION_START,
             monthdays=[
-               5
+               6
             ],  # Day 6 is arbitrary, we need to be sure to be check for risks after the rebalance
             monthcarry=True,
             cheat=False,
