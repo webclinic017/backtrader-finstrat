@@ -1,3 +1,14 @@
+# 2022-05-10
+* Multiple improvements in the algorithm:
+    * Don't propose candidates with negative momentum
+    * Reduce rolling regression window to 24 months from 36 months, to position better for the recent data
+    * Scale down exposure in risk weighting algorithm, when number of stocks is smaller than required.
+* Tested improvements on all universes across a range of settings
+    * Different monthly day for risk management
+* Potential reasons why some universes perform worse:
+    * Equal weighting universe - it actually is better if compared to proper benchmark (equal weighted SP500 ETF - e.g. RSP)
+    * Vanguard style ETF - due to small number of stocks in the universe, not many stocks are selected.
+
 # 2022-05-07
 * Studied sensitivity of SMA200 risk measurement timing:
     

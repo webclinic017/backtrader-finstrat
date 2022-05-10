@@ -145,7 +145,7 @@ class Strategy(bt.Strategy):
             name="risk",
             when=bt.timer.SESSION_START,
             monthdays=[
-               6
+              2
             ],  # Day 6 is arbitrary, we need to be sure to be check for risks after the rebalance
             monthcarry=True,
             cheat=False,
@@ -315,13 +315,20 @@ class Strategy(bt.Strategy):
         # In recovery mode, exclude safe assets
         if recovery_mode:
             all_valid_etfs = [
-                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1] and d not in self.safe_assets
+                d for d in self.d_with_len 
+                if d.close[-1] >= self.inds[d]["sma200"][-1] and 
+                d not in self.safe_assets and 
+                self.p.momentum_instance.get_momentum(d._name, current_date) >=0
             ]
 
         else:
             # get rid of candidates who are clearly in downtrend, regardless of momentum
             all_valid_etfs = [
-                d for d in self.d_with_len if d.close[-1] >= self.inds[d]["sma200"][-1]]
+                d for d in self.d_with_len 
+                if d.close[-1] >= self.inds[d]["sma200"][-1] and 
+            #    d not in self.safe_assets and 
+                self.p.momentum_instance.get_momentum(d._name, current_date) >= 0
+                ]
             
 
         top_long_momentums = sorted(
@@ -356,7 +363,12 @@ class Strategy(bt.Strategy):
             if self.p.weight_strategy == 'equal_weight':
                 weights = [1.0 / self.p.max_stocks] * len(self.buy_positions)
             elif self.p.weight_strategy == 'equal_risk':
+
                 weights = self.get_erc_weights(self.buy_positions) # Equal risk contributions (risk parity)
+                scale = min(len(self.buy_positions)/self.p.max_stocks, 1.0)
+                if scale < 1.0:
+                    self.log(f"SCALING DOWN EXPOSURE BY FACTOR: {scale:.2f}")
+                    weights = [w*scale for w in weights]
             else:
                 raise ValueError(f"Invalid weights strategy {self.p.weight_strategy}")
 
@@ -457,13 +469,13 @@ if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = INVESCO_STYLE_ETF
    # universe = VANGUARD_STYLE_ETF
-    #universe =BASIC_SECTOR_UNIVERSE
+    universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
-    universe = EXTENDED_UNIVERSE
+    #universe = EXTENDED_UNIVERSE
     #universe = RANDOM_STOCKS
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = HFEA_UNIVERSE
-    #universe = PBEAR
+    # universe = PBEAR
     cerebro = bt.Cerebro()
     cerebro.broker.setcash(100000.0)
 

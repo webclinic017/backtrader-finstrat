@@ -50,7 +50,7 @@ def idiosync_momentum(res: pd.Series, **kwargs) -> float:
 class IdiosyncMomentum:
     """Implemements idiosyncratic momentum estimation for multiple stocks"""
 
-    def __init__(self, ticker_data: dict, rolling_window_coeff=36, rolling_window_mom=5):
+    def __init__(self, ticker_data: dict, rolling_window_coeff=24, rolling_window_mom=5):
         logger.info("Initialazing Idiosyncratic Momentum...")
 
         self.ticker_data = ticker_data
