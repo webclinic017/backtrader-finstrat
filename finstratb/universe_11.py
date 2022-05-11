@@ -124,9 +124,15 @@ SECTOR_STYLE_UNIVERSE = [
     'XLU',
     'XLRE',
     'TLT',
-    "RPG", # Pure growth
-    "RPV", # Pure value',
-
+    # "RPG", # Pure growth
+    # "RPV", # Pure value',
+  "PWB", # Large cap growth
+  "PWV", # Large cap value
+  "XMMO", # Mid cap momentum
+  "SPHQ", # Quality
+  "XMVM", # Midvalue + momentum
+  "RPG", # Pure growth
+  "RPV", # Pure value
     'GLD'
 ]
 

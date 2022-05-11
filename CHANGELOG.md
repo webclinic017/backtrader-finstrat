@@ -1,3 +1,10 @@
+# 2022-05-11 
+* Simplification of the strategy
+    * Switch back to equal weighting - the strategy is less sensitive
+    * Decrease number of pyramiding steps to 1. After exclusion of negative momentum stocks, risk management can be reduced.
+    * Decrease number of default stocks to 3 - to better caputre the momentum.
+
+
 # 2022-05-10
 * Multiple improvements in the algorithm:
     * Don't propose candidates with negative momentum

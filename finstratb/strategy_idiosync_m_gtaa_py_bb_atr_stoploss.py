@@ -70,7 +70,7 @@ class Strategy(bt.Strategy):
         momentum_instance = None, 
       #   momentum=IdiosyncMomentum,  # parametrize the momentum and its period
         long_momentum_period=90,
-        max_stocks=4,
+        max_stocks=3,
         movav=bt.ind.SMA,  # parametrize the moving average and its periods
         spy_risk_ma=200,
         ticker_uptrend_ma=150,
@@ -78,18 +78,19 @@ class Strategy(bt.Strategy):
         # See here - https://www.investopedia.com/ask/answers/122214/what-does-end-quarter-mean-portfolio-management.asp
         #rebalance_months = [2,3,4,5,6,7,8,9,10,11,12],
         
-        #rebalance_months=[3,6,9,12],
+        #rebalance_months=[2,5,8,11],
         rebalance_months=[1, 4, 7, 10],
-        weight_strategy = ['equal_weight', 'equal_risk'][1],
+
+        weight_strategy = ['equal_weight', 'equal_risk'][0],
 
         profit_take_pct=0.35,
        # stop_loss_pct=-0.25,
 
         # minimum price increase percentage for pyramid buy
         pyramid_step_pct_increase=0.001, # 0.0025,
-        pyramid_n_steps=3,  # number of pyramid steps
+        pyramid_n_steps=1,  # number of pyramid steps
         bbands_period=20,  # bollinger bands look back period, used for purchase decision in the
-        bbands_devfactor=2,  # historical std deviation factor for BB calculation
+        bbands_devfactor=3,  # historical std deviation factor for BB calculation
         atr_factor_trailing_stop = 1,
         atr_max_days_from_high = 6
 
@@ -145,7 +146,7 @@ class Strategy(bt.Strategy):
             name="risk",
             when=bt.timer.SESSION_START,
             monthdays=[
-              2
+          2
             ],  # Day 6 is arbitrary, we need to be sure to be check for risks after the rebalance
             monthcarry=True,
             cheat=False,
@@ -468,14 +469,14 @@ class Strategy(bt.Strategy):
 if __name__ == "__main__":
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = INVESCO_STYLE_ETF
-   # universe = VANGUARD_STYLE_ETF
-    universe =BASIC_SECTOR_UNIVERSE
+    #universe = VANGUARD_STYLE_ETF
+    #universe =BASIC_SECTOR_UNIVERSE
     #universe = SECTOR_STYLE_UNIVERSE
-    #universe = EXTENDED_UNIVERSE
-    #universe = RANDOM_STOCKS
+    universe = EXTENDED_UNIVERSE
+   # universe = RANDOM_STOCKS
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = HFEA_UNIVERSE
-    # universe = PBEAR
+    #universe = PBEAR
     cerebro = bt.Cerebro()
     cerebro.broker.setcash(100000.0)
 
