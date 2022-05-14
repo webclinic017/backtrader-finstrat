@@ -31,7 +31,7 @@ from finstratb.misc.helpers import (
     get_yahooquery_data_from_file,
     get_single_ticker_data_from_file,
 )
-from finstratb.misc.mom_idiosync import IdiosyncMomentum
+from finstratb.misc.mom_idiosync import IdiosyncMomentum, AdaptiveIdiosyncMomentum, AdaptiveParameters
 from finstratb.misc.positioning import PyramidPositioning, EmptyPositionQueueException
 import collections
 import quantstats
@@ -146,7 +146,7 @@ class Strategy(bt.Strategy):
             name="risk",
             when=bt.timer.SESSION_START,
             monthdays=[
-          6
+          2
             ],  # Day 6 is arbitrary, we need to be sure to be check for risks after the rebalance
             monthcarry=True,
             cheat=False,
@@ -471,9 +471,9 @@ if __name__ == "__main__":
     #universe = INVESCO_STYLE_ETF
     #universe = VANGUARD_STYLE_ETF
     #universe =BASIC_SECTOR_UNIVERSE
-    universe = SECTOR_STYLE_UNIVERSE
-    #universe = EXTENDED_UNIVERSE
-    #universe = RANDOM_STOCKS
+    #universe = SECTOR_STYLE_UNIVERSE
+    universe = EXTENDED_UNIVERSE
+   # universe = RANDOM_STOCKS
     #universe = INVESCO_EQUAL_WEIGHT_ETF
     #universe = HFEA_UNIVERSE
     #universe = PBEAR
@@ -512,6 +512,29 @@ if __name__ == "__main__":
     # )
     
     imom = IdiosyncMomentum(ticker_data = data_dict)
+    imom = AdaptiveIdiosyncMomentum(data_dict, [
+                                              
+                                               AdaptiveParameters(24,3), 
+                                               AdaptiveParameters(24,8),  
+                                               
+                                               AdaptiveParameters(24,12),  
+                                               AdaptiveParameters(24,24),  
+                                               #AdaptiveParameters(12,6),  
+    
+                                               
+                                               
+                                               
+                                               #AdaptiveParameters(24,7),  
+                                               #AdaptiveParameters(24,9),  
+                                            #   AdaptiveParameters(36,6),  
+                                            #   AdaptiveParameters(12,6),  
+                                           #    AdaptiveParameters(12,5),  
+                                           #    AdaptiveParameters(6,3),  
+                                               #AdaptiveParameters(24,6),
+                                               #AdaptiveParameters(24,7),
+
+                        
+                                                ])
 
     for symbol, data in data_dict.items():
         # print(data)
@@ -557,5 +580,5 @@ if __name__ == "__main__":
     returns.index = returns.index.tz_convert(None)
 
     quantstats.reports.html(returns, benchmark="SPY",
-                            output="results/idiosync_rotation_stats_gtaa_pyramid_bb_positioning_atr.html")
+                            output="results/adapt_idiosync_rotation_stats_gtaa_pyramid_bb_positioning_atr.html")
     cerebro.plot(iplot=False)[0][0]

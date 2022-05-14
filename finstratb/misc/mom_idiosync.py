@@ -3,8 +3,9 @@
 https://papers.ssrn.com/abstract=2947044
 """
 
+from collections import namedtuple
 import datetime as dt
-from typing import Union
+from typing import List, Union
 
 import getFamaFrenchFactors as gff
 import numpy as np
@@ -44,13 +45,25 @@ def idiosync_momentum(res: pd.Series, **kwargs) -> float:
 
     n_month = kwargs.get("n_month", 5)
     r = res.iloc[-n_month:-1]
-    return r.sum()  # / r.std() / np.sqrt(len(r))
+
+    # weights = np.arange(1,n_month)
+    # Linearly decreasing weights. For example for 12 months, last month will have 4 times less weight than the current
+    weights = np.linspace(1, len(r) / 3, len(r))
+    # weights = np.ones(len(r))
+    weights = weights / np.sum(weights)  # Normalize to one
+    weigthed_returns = r * weights
+
+    # r_t = np.dot(weights/np.sum(weights), r)
+    # return r_t #/ r.std() # / np.sqrt(len(r))
+    # Nomralize by volatity. Normalization by sqrt(N) isn't necessary here, stays for formal reason
+    return weigthed_returns.sum() / np.sqrt(r.std()) / np.sqrt(len(r))
+    # return r.sum()  / r.std() #  / np.sqrt(len(r))
 
 
 class IdiosyncMomentum:
     """Implemements idiosyncratic momentum estimation for multiple stocks"""
 
-    def __init__(self, ticker_data: dict, rolling_window_coeff=24, rolling_window_mom=5):
+    def __init__(self, ticker_data: dict, rolling_window_coeff=24, rolling_window_mom=12):
         logger.info("Initialazing Idiosyncratic Momentum...")
 
         self.ticker_data = ticker_data
@@ -87,7 +100,7 @@ class IdiosyncMomentum:
         )
 
         monthly_combined = monthly_combined.assign(
-            residuals=rolling_apply( # Calculates rolling regression based on 36 month window
+            residuals=rolling_apply(  # Calculates rolling regression based on 36 month window
                 rolling_residuals,
                 self.rolling_window_coeff,
                 monthly_combined.index.values,
@@ -95,11 +108,11 @@ class IdiosyncMomentum:
                 monthly_combined["Mkt-RF"].values,
                 monthly_combined["SMB"].values,
                 monthly_combined["HML"].values,
-                n_jobs = 1 # Can increase parallelism
+                n_jobs=1,  # Can increase parallelism
             )
-        ).assign( 
+        ).assign(
             idiosync_momentum=lambda df: df["residuals"]
-            .rolling( # Calculates rolling residual momentum
+            .rolling(  # Calculates rolling residual momentum
                 15
             )  # Real calculation will be done on the window of less than 15 days, so this is just an upper limit.
             .apply(idiosync_momentum, kwargs={"n_month": self.rolling_window_mom})
@@ -119,10 +132,10 @@ class IdiosyncMomentum:
         Returns:
             float: value of the residual momentum
         """
-        
+
         if ticker not in self.all_tickers:
             raise KeyError(f"Data for {ticker} doesn't exist")
-        
+
         if ticker not in self._cache:
             logger.info(f"Caching data for {ticker}...")
             self._cache[ticker] = self._estimate_momentum(ticker)
@@ -132,6 +145,36 @@ class IdiosyncMomentum:
         return data.iloc[-1]["idiosync_momentum"]
 
 
+AdaptiveParameters = namedtuple("AdaptiveParameters", "rolling_window_coeff rolling_window_mom")
+
+
+class AdaptiveIdiosyncMomentum:
+    def __init__(self, ticker_data: dict, params: List[AdaptiveParameters]) -> None:
+        self.params = params
+        logger.info("Initializing Adaptive Momentum")
+        self.momentum_list = [
+            IdiosyncMomentum(ticker_data, p.rolling_window_coeff, p.rolling_window_mom) for p in params
+        ]
+
+    def get_momentum(self, ticker: str, date: Union[str, dt.datetime]) -> float:
+        """Calculates residual (idiosyncratic) momentum for a giver ticker and date.
+
+        Args:
+            ticker (str): ticker name, should be in the data
+            date (Union[str, dt.datetime]): Latest date for the momentum value, will return closest value not beyond the date
+
+        Raises:
+            KeyError: if requestes ticker doesn't exist in the input data.
+
+        Returns:
+            float: value of the residual momentum
+        """
+
+        mom_values = [m.get_momentum(ticker, date) for m in self.momentum_list]
+
+        return np.mean(mom_values)
+
+
 if __name__ == "__main__":
     from finstratb.misc.helpers import get_data
 
@@ -139,3 +182,6 @@ if __name__ == "__main__":
 
     imom = IdiosyncMomentum(data)
     print(imom.get_momentum("DBB", "2021-04-01"))
+
+    # adapt_mom = AdaptiveIdiosyncMomentum(data, [AdaptiveParameters(24,5), AdaptiveParameters(12,5), AdaptiveParameters(36,5)])
+    # print(adapt_mom.get_momentum("DBB", "2021-04-01"))

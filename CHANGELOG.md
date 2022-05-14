@@ -1,3 +1,14 @@
+# 2022-05-14
+* Significantly improved stability of the algo:
+    * Introduce linearly decreasing weights for taking into account past momentums.
+        * Allows to capture better recent momentum, however still taking the history into account.
+    * Turn on volaitiliy normalization in moment calculation.
+* More sensitivity tests:
+    * Risk check date - not too sensitive
+    * Window for averaging the momentum - checked 6,12,24 - not sensitive
+    * Rolling window for calculation of coefficients- tested 12,24,36 - not sensitive.
+
+
 # 2022-05-11 
 * Simplification of the strategy
     * Switch back to equal weighting - the strategy is less sensitive
